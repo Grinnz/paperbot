@@ -1,0 +1,4 @@
+paperbot
+========
+
+Paper IRC Bot
