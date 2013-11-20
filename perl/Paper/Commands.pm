@@ -2879,6 +2879,7 @@ sub do_wolframalpha_query {
 					$content =~ s/ \| / - /g;
 					$content =~ s/\r?\n/, /g;
 					$content =~ s/\\\:([0-9a-f]{4})/chr(hex($1))/egi;
+					$content =~ s/~~/\x{2248}/g;
 					push @contents, $content;
 				}
 				
