@@ -2836,7 +2836,9 @@ sub do_wolframalpha_query {
 				foreach my $subpod (@$subpods) {
 					my $content = $subpod->{'plaintext'};
 					next unless defined $content and !ref $content;
+					$content =~ s/ \| / - /g;
 					$content =~ s/\r?\n/, /g;
+					$content =~ s/\\\:([0-9a-f]{4})/chr(hex($1))/egi;
 					push @contents, $content;
 				}
 				
