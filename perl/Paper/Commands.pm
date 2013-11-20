@@ -2835,15 +2835,18 @@ sub do_wolframalpha_query {
 				$subpods = [$subpods] unless ref $subpods eq 'ARRAY';
 				foreach my $subpod (@$subpods) {
 					my $content = $subpod->{'plaintext'};
-					$content =~ s/\r?\n/  /g;
+					next unless defined $content and !ref $content;
+					$content =~ s/\r?\n/, /g;
 					push @contents, $content;
 				}
 				
-				my $pod_text = "$title: " . join '; ', @contents;
-				push @pod_contents, $pod_text;
+				if (@contents) {
+					my $pod_text = "$title: " . join '; ', @contents;
+					push @pod_contents, $pod_text;
+				}
 			}
 			
-			my $output = "WRA Response: " . join ' | ', @pod_contents;
+			my $output = join ' || ', @pod_contents;
 			
 			$self->print_debug("Response: $output");
 			$irc->yield(privmsg => $channel => $output);
