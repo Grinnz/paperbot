@@ -18,6 +18,7 @@ use Geo::IP;
 use XML::Atom::Entry;
 use XML::Atom::Feed;
 use XML::Simple;
+use XML::LibXML;
 use LWP::Simple;
 use LWP::UserAgent;
 use URI::Escape;
@@ -208,6 +209,18 @@ sub lwp {
 	}
 	
 	return $self->{'lwp'};
+}
+
+sub xml {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	
+	unless (defined $self->{'xml'}) {
+		my $xml = XML::LibXML->new;
+		$self->{'xml'} = $xml;
+	}
+	
+	return $self->{'xml'};
 }
 
 sub resolver {
@@ -1563,7 +1576,9 @@ sub search_wolframalpha {
 	
 	my $response = get($request);
 	return undef unless defined $response and $response =~ /^\</;
-	my $data = eval { XMLin($response); };
+	
+	my $xml = $self->xml;
+	my $data = eval { $xml->load_xml('string' => $response); };
 	warn $@ and return undef if $@;
 	return undef unless defined $data;
 	

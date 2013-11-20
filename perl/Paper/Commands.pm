@@ -2813,29 +2813,69 @@ sub do_wolframalpha_query {
 	
 	my $response = $self->search_wolframalpha($query, $address);
 	if (defined $response) {
-		if ($response->{'success'} ne 'true') {
-			if ($response->{'error'} ne 'false') {
-				my $err_msg = $response->{'error'}{'msg'};
+		my $result = $response->documentElement->findnodes("/queryresult")->shift;
+		my $success = $result->getAttribute('success');
+		my $error = $result->getAttribute('error');
+		if (defined $success and $success eq 'false') {
+			if (defined $error and $error eq 'true') {
+				my $err_msg = $result->findnodes("error/msg")->shift->textContent;
 				$irc->yield(privmsg => $channel => "Error querying Wolfram Alpha: $err_msg");
-			} elsif (defined $response->{'tips'}) {
-				my $tips = $response->{'tips'}{'tip'};
-				$tips = [$tips] unless ref $tips eq 'ARRAY';
-				$tips = join ' | ', @$tips;
-				$irc->yield(privmsg => $channel => "Query not understood: $tips");
+				return;
+			}
+			my @warning_output;
+			my $languagemsg = $result->findnodes("languagemsg")->shift;
+			if (defined $languagemsg) {
+				my $msg = $languagemsg->getAttribute('english');
+				push @warning_output, "Language error: $msg";
+			}
+			my $tips = $result->findnodes("tips")->shift;
+			if (defined $tips) {
+				my $tips_list = $tips->findnodes("tip");
+				my $tips_str = join '; ', map { $_->getAttribute('text') } $tips_list->get_nodelist;
+				push @warning_output, "Query not understood: $tips_str";
+			}
+			my $didyoumeans = $result->findnodes("didyoumeans")->shift;
+			if (defined $didyoumeans) {
+				my $didyoumean_list = $didyoumeans->findnodes("didyoumean");
+				my $didyoumean_str = join '; ', map { $_->textContent } $didyoumean_list->get_nodelist;
+				push @warning_output, "Did you mean: $didyoumean_str";
+			}
+			my $futuretopic = $result->findnodes("futuretopic")->shift;
+			if (defined $futuretopic) {
+				my $topic = $futuretopic->getAttribute('topic');
+				my $msg = $futuretopic->getAttribute('msg');
+				push @warning_output, "$topic: $msg";
+			}
+			my $relatedexamples = $result->findnodes("relatedexamples")->shift;
+			if (defined $relatedexamples) {
+				my $example_list = $relatedexamples->findnodes("relatedexample");
+				my $example_str = join '; ', map { $_->getAttribute('category') } $example_list->get_nodelist;
+				push @warning_output, "Related categories: $example_str";
+			}
+			my $examplepage = $result->findnodes("examplepage")->shift;
+			if (defined $examplepage) {
+				my $category = $examplepage->getAttribute('category');
+				my $url = $examplepage->getAttribute('url');
+				push @warning_output, "See category $category: $url";
+			}
+			if (@warning_output) {
+				$irc->yield(privmsg => $channel => join(' || ', @warning_output));
 			} else {
-				$irc->yield(privmsg => $channel => "Query was not successful");
+				$irc->yield(privmsg => $channel => "Query was unsuccessful");
 			}
 		} else {
 			my @pod_contents;
-			foreach my $id (keys %{$response->{'pod'}}) {
-				my $pod = $response->{'pod'}{$id};
-				my $title = $pod->{'title'};
+			my $pods = $result->findnodes("pod");
+			foreach my $pod ($pods->get_nodelist) {
+				my $title = $pod->getAttribute('title');
 				my @contents;
-				my $subpods = $pod->{'subpod'};
-				$subpods = [$subpods] unless ref $subpods eq 'ARRAY';
-				foreach my $subpod (@$subpods) {
-					my $content = $subpod->{'plaintext'};
-					next unless defined $content and !ref $content;
+				my $subpods = $pod->findnodes("subpod");
+				foreach my $subpod ($subpods->get_nodelist) {
+					my $plaintext = $subpod->findnodes("plaintext");
+					next unless defined $plaintext and $plaintext->size;
+					my $content = $plaintext->shift->textContent;
+					next unless defined $content and length $content;
+					
 					$content =~ s/ \| / - /g;
 					$content =~ s/\r?\n/, /g;
 					$content =~ s/\\\:([0-9a-f]{4})/chr(hex($1))/egi;
