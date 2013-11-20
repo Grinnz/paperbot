@@ -696,14 +696,14 @@ sub queue_cmd_clear {
 sub queue_whois {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
-	my ($user, $channel, $type, $sender) = @_;
+	my ($user, $channel, $type, $sender, $args) = @_;
 	croak "No user name given" unless defined $user;
 	croak "No lookup type given" unless defined $type;
 	croak "No lookup subject given" unless defined $sender;
 	
 	my $queue = $self->{'queue'}{'whois'};
 	
-	$queue->{lc $user} = { 'channel' => $channel, 'type' => $type, 'sender' => $sender, 'timestamp' => time };
+	$queue->{lc $user} = { 'channel' => $channel, 'type' => $type, 'sender' => $sender, 'timestamp' => time, 'args' => $args };
 	
 	return $queue->{lc $user};
 }
@@ -742,6 +742,18 @@ sub queue_whois_sender {
 	
 	return undef unless exists $queue->{lc $user};
 	return $queue->{lc $user}{'sender'};
+}
+
+sub queue_whois_args {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $user = shift;
+	croak "No user name given" unless defined $user;
+	
+	my $queue = $self->{'queue'}{'whois'};
+	
+	return undef unless exists $queue->{lc $user};
+	return $queue->{lc $user}{'args'};
 }
 
 sub queue_whois_exists {
@@ -1029,6 +1041,10 @@ sub dns_response {
 					$self->print_debug("Location of $address unknown");
 					$irc->yield(privmsg => $channel => "Could not find location of $question");
 				}
+			} elsif ($action eq 'wolframalpha') {
+				my $query = $result->{context}{query};
+				$self->print_debug("Sending query to Wolfram Alpha with location IP $address");
+				$self->do_wolframalpha_query($irc,$sender,$channel,$query,$address);
 			} else {
 				$irc->yield(privmsg => $channel => "$lookuptype lookup for $question: " . $address);
 			}
@@ -1527,6 +1543,31 @@ sub lookup_geoip_weather {
 		my $location = join ', ', grep { defined } @location_parts;
 		return $location;
 	}
+}
+
+sub search_wolframalpha {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $query = shift;
+	croak "Invalid parameters" unless defined $query;
+	my $ip = shift;
+	
+	my $appid = $self->config_var('wolframalphaid');
+	
+	$query = uri_escape($query);
+	
+	my $request = "http://api.wolframalpha.com/v2/query?input=$query&appid=$appid&format=plaintext";
+	if (defined $ip) {
+		$request .= "&ip=$ip";
+	}
+	
+	my $response = get($request);
+	return undef unless defined $response and $response =~ /^\</;
+	my $data = eval { XMLin($response); };
+	warn $@ and return undef if $@;
+	return undef unless defined $data;
+	
+	return $data;
 }
 
 # === Internal use methods ===

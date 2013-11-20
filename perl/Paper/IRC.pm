@@ -532,8 +532,9 @@ sub irc_318 { # RPL_ENDOFWHOIS
 			my $channel = $self->queue_whois_channel($nick);
 			my $type = $self->queue_whois_type($nick);
 			my $sender = $self->queue_whois_sender($nick);
+			my $args = $self->queue_whois_args($nick) // $nick;
 			$self->queue_whois_delete($nick);
-			$self->say_userinfo($irc,$type,$sender,$channel,$nick);
+			$self->say_userinfo($irc,$type,$sender,$channel,$args);
 		}
 		if ($self->queue_invite_exists($nick) and $self->queue_invite_step($nick) eq 'whois') {
 			if ($self->state_user($nick, 'ident')) {
@@ -559,8 +560,11 @@ sub irc_318 { # RPL_ENDOFWHOIS
 			my $type = $self->queue_whois_type($nick);
 			my $channel = $self->queue_whois_channel($nick);
 			my $sender = $self->queue_whois_sender($nick);
+			my $args = $self->queue_whois_args($nick) // $nick;
 			if ($type eq 'dns') {
-				$self->say_userinfo($irc, 'dns', $sender, $channel, $nick);
+				$self->say_userinfo($irc, 'dns', $sender, $channel, $args);
+			} elsif ($type eq 'wolframalpha') {
+				$self->say_userinfo($irc, 'wolframalpha', $sender, $channel, $args);
 			} else {
 				$irc->yield(privmsg => $channel, "Error: No such user ($nick)");
 			}

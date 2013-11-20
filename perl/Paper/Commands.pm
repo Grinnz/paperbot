@@ -25,7 +25,7 @@ use constant {
 	ACCESS_MASTER => 6
 };
 
-our @EXPORT = qw/cmds_substr_index command_exists command_strip parse_cmd check_access cmd_queue_info say_userinfo do_conversion
+our @EXPORT = qw/cmds_substr_index command_exists command_strip parse_cmd check_access cmd_queue_info say_userinfo do_conversion do_wolframalpha_query
 	ACCESS_NONE ACCESS_VOICE ACCESS_HALFOP ACCESS_OP ACCESS_CHANADMIN ACCESS_BOTADMIN ACCESS_MASTER/;
 
 my %userinfo = (
@@ -36,7 +36,8 @@ my %userinfo = (
 	'dns' => \&say_dnshost,
 	'locate' => \&say_locate,
 	'weather' => \&say_weather,
-	'forecast' => \&say_forecast
+	'forecast' => \&say_forecast,
+	'wolframalpha' => \&say_wolframalpha
 );
 
 my %command = (
@@ -109,6 +110,7 @@ my %command = (
 	'translate' => { func => 'cmd_translate', access => ACCESS_NONE, on => 1, strip => 1 },
 	'speak' => { func => 'cmd_speak', access => ACCESS_VOICE, on => 1, strip => 1 },
 	'twitter' => { func => 'cmd_twitter', access => ACCESS_NONE, on => 1, strip => 1 },
+	'wolframalpha' => { func => 'cmd_wolframalpha', access => ACCESS_NONE, on => 1, strip => 1 }
 );
 
 sub cmds_structure {
@@ -141,10 +143,10 @@ sub cmds_substr_index {
 
 sub say_userinfo {
 	my $self = shift;
-	my ($irc,$type,$sender,$channel,$nick) = @_;
+	my ($irc,$type,$sender,$channel,$args) = @_;
 	return undef unless exists $userinfo{$type};
 	my $sub = $userinfo{$type};
-	return $self->$sub($irc,$sender,$channel,$nick);
+	return $self->$sub($irc,$sender,$channel,$args);
 }
 
 sub say_whois {
@@ -479,6 +481,34 @@ sub say_forecast {
 		$irc->yield(privmsg => $channel => $forecast_str);
 	} else {
 		$irc->yield(privmsg => $channel => "Could not find forecast for $loc");
+	}
+}
+
+sub say_wolframalpha {
+	my $self = shift;
+	my ($irc,$sender,$channel,$query) = @_;
+	$channel = $sender unless $channel;
+	
+	my ($host, $question);
+	if ($self->state_user_exists($sender)) {
+		$host = $self->state_user($sender, 'host');
+		$question = "$sender ($host)";
+	} else {
+		$host = $sender;
+		$question = $sender;
+	}
+	
+	my $result = $self->resolver->resolve(
+		type	=> 'A',
+		host	=> $host,
+		context	=> { irc => $irc, question => $question, channel => $channel, sender => $sender, action => 'wolframalpha', query => $query },
+		event => 'dns_response',
+	);
+	if (defined $result) {
+		my @args;
+		$args[ARG0] = $result;
+		splice @args, 0, 1;
+		$self->dns_response(@args);
 	}
 }
 
@@ -2741,6 +2771,85 @@ sub cmd_twitter {
 		$irc->yield(privmsg => $channel => "Twitter result: Posted by $name ($b_code\@$username$b_code) $ago$in_reply_to: $content [ $url ]");
 	} else {
 		$irc->yield(privmsg => $channel => "No more results");
+	}
+}
+
+sub cmd_wolframalpha {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$channel = $sender unless $channel;
+	
+	my $query = $args;
+	
+	if ($self->state_user_exists($sender)) {
+		my $host = $self->state_user($sender, 'host');
+		my $result = $self->resolver->resolve(
+			type	=> 'A',
+			host	=> $host,
+			context	=> { irc => $irc, question => "$sender ($host)", channel => $channel, sender => $sender, action => 'wolframalpha', query => $query },
+			event	=> 'dns_response',
+		);
+		if (defined $result) {
+			my @args;
+			$args[ARG0] = $result;
+			splice @args, 0, 1;
+			$self->dns_response(@args);
+		}
+	} else {
+		if (!$self->queue_whois_exists($sender)) {
+			$self->queue_whois($sender, $channel, 'wolframalpha', $sender, $query);
+			$irc->yield(whois => $sender);
+		}
+		else {
+			$irc->yield(privmsg => $channel => "$sender: Please repeat command in a few seconds.");
+		}
+	}
+}
+
+sub do_wolframalpha_query {
+	my $self = shift;
+	my ($irc,$sender,$channel,$query,$address) = @_;
+	$channel = $sender unless $channel;
+	
+	my $response = $self->search_wolframalpha($query, $address);
+	if (defined $response) {
+		if ($response->{'success'} ne 'true') {
+			if ($response->{'error'} ne 'false') {
+				my $err_msg = $response->{'error'}{'msg'};
+				$irc->yield(privmsg => $channel => "Error querying Wolfram Alpha: $err_msg");
+			} elsif (defined $response->{'tips'}) {
+				my $tips = $response->{'tips'}{'tip'};
+				$tips = [$tips] unless ref $tips eq 'ARRAY';
+				$tips = join ' | ', @$tips;
+				$irc->yield(privmsg => $channel => "Query not understood: $tips");
+			} else {
+				$irc->yield(privmsg => $channel => "Query was not successful");
+			}
+		} else {
+			my @pod_contents;
+			foreach my $id (keys %{$response->{'pod'}}) {
+				my $pod = $response->{'pod'}{$id};
+				my $title = $pod->{'title'};
+				my @contents;
+				my $subpods = $pod->{'subpod'};
+				$subpods = [$subpods] unless ref $subpods eq 'ARRAY';
+				foreach my $subpod (@$subpods) {
+					my $content = $subpod->{'plaintext'};
+					$content =~ s/\r?\n/  /g;
+					push @contents, $content;
+				}
+				
+				my $pod_text = "$title: " . join '; ', @contents;
+				push @pod_contents, $pod_text;
+			}
+			
+			my $output = "WRA Response: " . join ' | ', @pod_contents;
+			
+			$self->print_debug("Response: $output");
+			$irc->yield(privmsg => $channel => $output);
+		}
+	} else {
+		$irc->yield(privmsg => $channel => "Error querying Wolfram Alpha");
 	}
 }
 
