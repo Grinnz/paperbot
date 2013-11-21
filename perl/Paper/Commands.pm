@@ -2871,15 +2871,19 @@ sub do_wolframalpha_query {
 				my @contents;
 				my $subpods = $pod->findnodes("subpod");
 				foreach my $subpod ($subpods->get_nodelist) {
+					my $subtitle = $subpod->getAttribute('title');
 					my $plaintext = $subpod->findnodes("plaintext");
 					next unless defined $plaintext and $plaintext->size;
 					my $content = $plaintext->shift->textContent;
 					next unless defined $content and length $content;
 					
 					$content =~ s/ \| / - /g;
+					$content =~ s/^\r?\n//;
+					$content =~ s/\r?\n$//;
 					$content =~ s/\r?\n/, /g;
 					$content =~ s/\\\:([0-9a-f]{4})/chr(hex($1))/egi;
 					$content =~ s/~~/\x{2248}/g;
+					$content = "$subtitle: $content" if defined $subtitle and length $subtitle;
 					push @contents, $content;
 				}
 				
