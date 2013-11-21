@@ -17,7 +17,6 @@ use Sys::Statistics::Linux::SysInfo;
 use Geo::IP;
 use XML::Atom::Entry;
 use XML::Atom::Feed;
-use XML::Simple;
 use XML::LibXML;
 use LWP::Simple;
 use LWP::UserAgent;
@@ -1360,9 +1359,13 @@ sub translate {
 	
 	my $response = $lwp->get($request, 'Authorization' => "Bearer $access_token");
 	if ($response->is_success) {
-		my $response_decoded = eval { XMLin($response->decoded_content); };
+		my $xml = $self->xml;
+		my $response_decoded = eval { $xml->load_xml('string' => $response->decoded_content); };
 		warn $@ and return undef if $@;
-		return $response_decoded->{'content'};
+		
+		my $string = $response_decoded->documentElement;
+		return undef unless defined $string;
+		return $string->textContent;
 	} else {
 		$self->print_debug("Error requesting translation: ".$response->status_line);
 		return undef;
@@ -1386,9 +1389,13 @@ sub translate_detect {
 	
 	my $response = $lwp->get($request, 'Authorization' => "Bearer $access_token");
 	if ($response->is_success) {
-		my $response_decoded = eval { XMLin($response->decoded_content); };
+		my $xml = $self->xml;
+		my $response_decoded = eval { $xml->load_xml('string' => $response->decoded_content); };
 		warn $@ and return undef if $@;
-		return $response_decoded->{'content'};
+		
+		my $string = $response_decoded->documentElement;
+		return undef unless defined $string;
+		return $string->textContent;
 	} else {
 		$self->print_debug("Error requesting language detection: ".$response->status_line);
 		return undef;
