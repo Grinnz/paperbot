@@ -1237,11 +1237,15 @@ sub search_weatherbug_weather_zipcode {
 	
 	my $result = get($request);
 	return undef unless defined $result and $result =~ /^\</;
-	my $data = eval { XMLin($result); };
+	
+	my $xml = $self->xml;
+	my $data = eval { $xml->load_xml('string' => $result); };
 	warn $@ and return undef if $@;
 	return undef unless defined $data;
 	
-	return $data;
+	my $weather = $data->documentElement->findnodes("/aws:weather");
+	return undef unless defined $weather and $weather->size;
+	return $weather->shift;
 }
 
 sub search_weatherbug_weather_citycode {
@@ -1256,11 +1260,15 @@ sub search_weatherbug_weather_citycode {
 	
 	my $result = get($request);
 	return undef unless defined $result and $result =~ /^\</;
-	my $data = eval { XMLin($result); };
+
+	my $xml = $self->xml;
+	my $data = eval { $xml->load_xml('string' => $result); };
 	warn $@ and return undef if $@;
 	return undef unless defined $data;
 	
-	return $data;
+	my $weather = $data->documentElement->findnodes("/aws:weather");
+	return undef unless defined $weather and $weather->size;
+	return $weather->shift;
 }
 
 sub search_weatherbug_forecast_zipcode {
@@ -1275,11 +1283,15 @@ sub search_weatherbug_forecast_zipcode {
 	
 	my $result = get($request);
 	return undef unless defined $result and $result =~ /^\</;
-	my $data = eval { XMLin($result); };
+
+	my $xml = $self->xml;
+	my $data = eval { $xml->load_xml('string' => $result); };
 	warn $@ and return undef if $@;
 	return undef unless defined $data;
 	
-	return $data->{'aws:forecasts'};
+	my $forecasts = $data->documentElement->findnodes("/aws:weather/aws:forecasts");
+	return undef unless defined $forecasts and $forecasts->size;
+	return $forecasts->shift;
 }
 
 sub search_weatherbug_forecast_citycode {
@@ -1294,11 +1306,15 @@ sub search_weatherbug_forecast_citycode {
 	
 	my $result = get($request);
 	return undef unless defined $result and $result =~ /^\</;
-	my $data = eval { XMLin($result); };
+
+	my $xml = $self->xml;
+	my $data = eval { $xml->load_xml('string' => $result); };
 	warn $@ and return undef if $@;
 	return undef unless defined $data;
 	
-	return $data->{'aws:forecasts'};
+	my $forecasts = $data->documentElement->findnodes("/aws:weather/aws:forecasts");
+	return undef unless defined $forecasts and $forecasts->size;
+	return $forecasts->shift;
 }
 
 sub search_weatherbug_location {
@@ -1315,11 +1331,15 @@ sub search_weatherbug_location {
 	
 	my $result = get($request);
 	return undef unless defined $result and $result =~ /^\</;
-	my $data = eval { XMLin($result); };
+
+	my $xml = $self->xml;
+	my $data = eval { $xml->load_xml('string' => $result); };
 	warn $@ and return undef if $@;
 	return undef unless defined $data;
 	
-	return $data;
+	my $locations = $data->documentElement->findnodes("/aws:weather/aws:locations");
+	return undef unless defined $locations and $locations->size;
+	return $locations->shift;
 }
 
 sub translate {
