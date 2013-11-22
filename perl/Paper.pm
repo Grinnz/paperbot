@@ -30,7 +30,7 @@ use MIME::Base64;
 use Paper::IRC;
 use Paper::Commands;
 
-use version; our $VERSION = version->declare('v1.1.0');
+use version; our $VERSION = version->declare('v1.2.0');
 
 use constant {
 	IRC_SOCIALGAMER => 1,
