@@ -12,6 +12,7 @@ use Scalar::Util qw/looks_like_number/;
 use Math::Complex;
 use Math::Trig;
 use Data::Validate::IP qw/is_ipv4 is_ipv6/;
+use Encode qw/decode/;
 
 use constant MAX_FORECAST_DAYS => 3;
 
@@ -2923,14 +2924,15 @@ sub do_wolframalpha_query {
 					next unless defined $plaintext and $plaintext->size;
 					my $content = $plaintext->shift->textContent;
 					next unless defined $content and length $content;
-					
 					$content =~ s/ \| / - /g;
 					$content =~ s/^\r?\n//;
 					$content =~ s/\r?\n$//;
 					$content =~ s/\r?\n/, /g;
 					$content =~ s/\\\:([0-9a-f]{4})/chr(hex($1))/egi;
 					$content =~ s/~~/\x{2248}/g;
-					$content = "$subtitle: $content" if defined $subtitle and length $subtitle;
+					if (defined $subtitle and length $subtitle) {
+						$content = "$subtitle: $content";
+					}
 					push @contents, $content;
 				}
 				
