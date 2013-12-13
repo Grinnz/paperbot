@@ -13,6 +13,7 @@ use Math::Complex;
 use Math::Trig;
 use Data::Validate::IP qw/is_ipv4 is_ipv6/;
 use Encode qw/decode/;
+use LWP::Simple;
 
 use constant MAX_FORECAST_DAYS => 3;
 
