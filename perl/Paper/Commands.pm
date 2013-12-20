@@ -2943,10 +2943,15 @@ sub do_wolframalpha_query {
 				}
 			}
 			
-			my $output = join ' || ', @pod_contents;
-			
-			$self->print_debug("Response: $output");
-			$irc->yield(privmsg => $channel => $output);
+			if (@pod_contents) {
+				my $output = join ' || ', @pod_contents;
+				
+				$self->print_debug("Response: $output");
+				$irc->yield(privmsg => $channel => $output);
+			} else {
+				$self->print_debug("No response");
+				$irc->yield(privmsg => $channel => "No output from Wolfram|Alpha query");
+			}
 		}
 	} else {
 		$irc->yield(privmsg => $channel => "Error querying Wolfram Alpha");
