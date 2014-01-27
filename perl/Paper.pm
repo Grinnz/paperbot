@@ -109,10 +109,17 @@ sub new {
 	$self->{'version'} = $version;
 	bless $self, $class;
 	
+	return $self;
+}
+
+sub init_irc {
+	my $self = shift;
+	
 	$self->load_config;
 	$self->load_db;
 	$self->load_quotes;
 	
+	my $version = $self->{'version'};
 	my $master = $self->config_var('master');
 	my $ircname = "Paperbot $version";
 	$ircname .= " by $master" if defined $master;
@@ -130,6 +137,14 @@ sub new {
 }
 
 # === Object accessors ===
+
+sub is_stopping {
+	my $self = shift;
+	if (@_) {
+		$self->{'is_stopping'} = 1;
+	}
+	return $self->{'is_stopping'};
+}
 
 sub nick {
 	my $self = shift;
@@ -965,6 +980,7 @@ sub _start {
 	my $self = $_[OBJECT];
 	my $heap = $_[HEAP];
 	my $irc = $heap->{irc};
+	my $kernel = $_[KERNEL];
 	
 	my $ircname = $self->config_var('ircname') // DEFAULT_CONFIG->{'ircname'};
 
@@ -979,6 +995,10 @@ sub _start {
 	$self->print_debug("Starting connection to $server/$port...");
 	$self->start_time(time);
 	$irc->yield( connect => {} );
+	
+	$kernel->sig(TERM => 'sig_terminate');
+	$kernel->sig(QUIT => 'sig_terminate');
+	$kernel->sig(INT => 'sig_terminate');
 	
 	#$self->get_translator_languages;
 	
@@ -998,6 +1018,18 @@ sub _default {
 	}
 	$self->print_debug(join ' ', @output);
 	return 0;
+}
+
+sub sig_terminate {
+	my $self = $_[OBJECT];
+	my $kernel = $_[KERNEL];
+	my $signal = $_[ARG0];
+	
+	$self->print_debug("Received signal SIG$signal");
+	
+	$self->is_stopping(1);
+	$self->end_sessions;
+	$kernel->sig_handled;
 }
 
 sub dns_response {
@@ -2037,9 +2069,12 @@ sub autojoin {
 
 sub end_sessions {
 	my $self = shift;
-	$self->irc->yield(join => '0');
-	$self->resolver->shutdown;
-	$self->irc->yield(shutdown => 'Bye');
+	if (defined $self->{'irc'}) {
+		$self->irc->yield(join => '0');
+		$self->resolver->shutdown;
+		$self->irc->yield(shutdown => 'Bye');
+		undef $self->{'irc'};
+	}
 	$self->print_debug("Disconnected. Saving data.");
 	$self->store_db;
 	$self->store_config;
@@ -2062,29 +2097,29 @@ sub parse_config_line {
 }
 
 sub strip_google {
-    my $arg = shift;
-    my $b_code = chr(2);
-    $arg =~ s/<b>/$b_code/g;
-    $arg =~ s/<\/b>/$b_code/g;
-    return decode_entities $arg;
+	my $arg = shift;
+	my $b_code = chr(2);
+	$arg =~ s/<b>/$b_code/g;
+	$arg =~ s/<\/b>/$b_code/g;
+	return decode_entities $arg;
 }
 
 sub strip_xml { return strip_wide(@_, 128); }
 sub strip_wide {
-    my $arg = shift;
-    my $len = shift;
-    $len = 256 unless defined $len and $len > 0;
-    my @chars = split '', $arg;
-    foreach (0..$#chars) {
-	my $charnum = ord $chars[$_];
-	if ($charnum > $len-1) {
-	    my $highnum = int($charnum/$len);
-	    my $highchar = chr $highnum;
-	    my $lowchar = chr $charnum-$highnum*$len;
-	    $chars[$_] = strip_wide("$highchar$lowchar", $len);
+	my $arg = shift;
+	my $len = shift;
+	$len = 256 unless defined $len and $len > 0;
+	my @chars = split '', $arg;
+	foreach (0..$#chars) {
+		my $charnum = ord $chars[$_];
+		if ($charnum > $len-1) {
+			my $highnum = int($charnum/$len);
+			my $highchar = chr $highnum;
+			my $lowchar = chr $charnum-$highnum*$len;
+			$chars[$_] = strip_wide("$highchar$lowchar", $len);
+		}
 	}
-    }
-    return join('', @chars);
+	return join('', @chars);
 }
 
 1;

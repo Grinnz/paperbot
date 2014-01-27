@@ -48,6 +48,7 @@ my %command = (
 	'fuckoff' => { func => 'cmd_fuckoff', access => ACCESS_BOTADMIN, on => 1, strip => 0 },
 	'leave' => { func => 'cmd_leave', access => ACCESS_CHANADMIN, on => 1, strip => 0 },
 	'quit' => { func => 'cmd_quit', access => ACCESS_MASTER, on => 1, strip => 0 },
+	'restart' => { func => 'cmd_restart', access => ACCESS_MASTER, on => 1, strip => 0 },
 	'say' => { func => 'cmd_say', access => ACCESS_VOICE, on => 1, strip => 0 },
 	'me' => { func => 'cmd_me', access => ACCESS_VOICE, on => 1, strip => 0 },
 	'ping' => { func => 'cmd_ping', access => ACCESS_VOICE, on => 1, strip => 0 },
@@ -879,6 +880,16 @@ sub cmd_quit {
 	my ($irc,$sender,$channel,$args) = @_;
 	$self->print_debug("Quitting at request of $sender.");
 	if (!$args) { $args = "Requested to quit by $sender"; }
+	$self->is_stopping(1);
+	$irc->yield(join => '0');
+	$irc->yield(quit => $args);
+}
+
+sub cmd_restart {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$self->print_debug("Restarting at request of $sender.");
+	if (!$args) { $args = "Requested to restart by $sender"; }
 	$irc->yield(join => '0');
 	$irc->yield(quit => $args);
 }
