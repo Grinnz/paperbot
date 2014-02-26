@@ -332,39 +332,47 @@ sub irc_public {
 		}
 	}
 	
-	if ($self->config_var('catchtweet') and strip_formatting($msg) =~ m!(https?://)?(www\.)?twitter\.com/([^/]+?)/status/(\d+)!) {
-		my $tweet_id = $4;
-		$self->print_debug("Caught tweet: $tweet_id");
-		my $tweet = $self->search_twitter_id($tweet_id);
-		if (defined $tweet) {
-			$self->print_debug("Resolved tweet by " . $tweet->{'user'}{'screen_name'} . ": " . $tweet->{'text'});
-			my $username = $tweet->{'user'}{'screen_name'};
-			my $content = $tweet->{'text'};
-			unless (defined $username and defined $content) {
-				$irc->yield(privmsg => $channel => "Invalid tweet information");
-				return;
-			}
-			
-			my $base_url = "https://twitter.com";
-			my $id = $tweet->{'id'};
-			my $url = "$base_url/$username/status/$id";
-			
-			my $b_code = chr(2);
-
-			my $name = $tweet->{'user'}{'name'} // $username;
-			my $in_reply_to_id = $tweet->{'in_reply_to_status_id'};
-			my $in_reply_to_user = $tweet->{'in_reply_to_screen_name'};
-			my $in_reply_to = '';
-			if (defined $in_reply_to_id) {
-				$in_reply_to = " in reply to $b_code\@$in_reply_to_user$b_code tweet \#$in_reply_to_id";
-			}
+	if ($self->config_var('catchtweet')) {
+		my $tweet_id;
+		if (strip_formatting($msg) =~ m!(https?://)?(www\.)?twitter\.com/([^/]+?)/status/(\d+)!) {
+			$tweet_id = $4;
+		} elsif (strip_formatting($msg) =~ m!(https?://)?(www\.)?twitter\.com/statuses/(\d+)!) {
+			$tweet_id = $3;
+		}
 		
-			$content = $self->parse_tweet_text($content);
-			my $ago = ago(time-(str2time($tweet->{'created_at'})//time));
-			$irc->yield(privmsg => $channel => "Tweet linked by $sender: Posted by $name ($b_code\@$username$b_code) $ago$in_reply_to: $content [ $url ]");
-		} else {
-			$self->print_debug("Cannot find tweet: $tweet_id");
-			$irc->yield(privmsg => $channel => "Tweet linked by $sender: Not found");
+		if (defined $tweet_id) {
+			$self->print_debug("Caught tweet: $tweet_id");
+			my $tweet = $self->search_twitter_id($tweet_id);
+			if (defined $tweet) {
+				$self->print_debug("Resolved tweet by " . $tweet->{'user'}{'screen_name'} . ": " . $tweet->{'text'});
+				my $username = $tweet->{'user'}{'screen_name'};
+				my $content = $tweet->{'text'};
+				unless (defined $username and defined $content) {
+					$irc->yield(privmsg => $channel => "Invalid tweet information");
+					return;
+				}
+				
+				my $base_url = "https://twitter.com";
+				my $id = $tweet->{'id'};
+				my $url = "$base_url/$username/status/$id";
+				
+				my $b_code = chr(2);
+			
+				my $name = $tweet->{'user'}{'name'} // $username;
+				my $in_reply_to_id = $tweet->{'in_reply_to_status_id'};
+				my $in_reply_to_user = $tweet->{'in_reply_to_screen_name'};
+				my $in_reply_to = '';
+				if (defined $in_reply_to_id) {
+					$in_reply_to = " in reply to $b_code\@$in_reply_to_user$b_code tweet \#$in_reply_to_id";
+				}
+			
+				$content = $self->parse_tweet_text($content);
+				my $ago = ago(time-(str2time($tweet->{'created_at'})//time));
+				$irc->yield(privmsg => $channel => "Tweet linked by $sender: Posted by $name ($b_code\@$username$b_code) $ago$in_reply_to: $content [ $url ]");
+			} else {
+				$self->print_debug("Cannot find tweet: $tweet_id");
+				$irc->yield(privmsg => $channel => "Tweet linked by $sender: Not found");
+			}
 		}
 	}
 
