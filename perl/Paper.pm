@@ -14,7 +14,7 @@ use POE qw/Component::IRC Component::IRC::Plugin::CTCP Component::Client::DNS/;
 use Text::Aspell;
 use REST::Google::Search::Web;
 use Sys::Statistics::Linux::SysInfo;
-use Geo::IP;
+use GeoIP2::Database::Reader;
 use XML::Atom::Entry;
 use XML::Atom::Feed;
 use XML::LibXML;
@@ -30,7 +30,7 @@ use MIME::Base64;
 use Paper::IRC;
 use Paper::Commands;
 
-use version; our $VERSION = version->declare('v1.2.0');
+use version; our $VERSION = version->declare('v1.3.0');
 
 use constant {
 	IRC_SOCIALGAMER => 1,
@@ -58,7 +58,7 @@ use constant DEFAULT_CONFIG => {
 	ssl => 0,
 	port => 6667,
 	master => 'Grinnz',
-	geoipfile => '/usr/local/share/GeoIP/GeoLiteCity.dat'
+	geoip2file => '/usr/local/share/GeoIP/GeoLite2-City.mmdb'
 };
 
 use constant DEFAULT_DB => {
@@ -330,11 +330,11 @@ sub geoip {
 	croak "Not called as an object method" unless defined $self;
 	
 	unless (defined $self->{'geoip'}) {
-		my $geoipfile = $self->config_var('geoipfile');
-		$self->print_debug("GeoIP database file configuration is missing") and return undef unless defined $geoipfile;
-		my $geoip = eval { Geo::IP->open($geoipfile, GEOIP_INDEX_CACHE | GEOIP_CHECK_CACHE); };
+		my $geoipfile = $self->config_var('geoip2file');
+		$self->print_debug("GeoIP2 database file configuration is missing") and return undef unless defined $geoipfile;
+		my $geoip = eval { GeoIP2::Database::Reader->new(file => $geoipfile); };
 		if ($@) {
-			$self->print_debug("Error opening GeoIP database: $@");
+			$self->print_debug("Error opening GeoIP2 database: $@");
 			return undef;
 		}
 		$self->{'geoip'} = $geoip;
@@ -1576,11 +1576,11 @@ sub lookup_geoip_record {
 	
 	my $geoip = $self->geoip;
 	
-	if (is_ipv4($ip)) {
-		my $record = $geoip->record_by_addr($ip);
+	if (is_ipv4($ip) or is_ipv6($ip)) {
+		my $geoip = $self->geoip;
+		my $record = eval { $geoip->city(ip => $ip); };
+		warn $@ and return undef if $@;
 		return $record;
-	} elsif (is_ipv6($ip)) {
-		return undef; #TODO
 	} else {
 		return undef;
 	}
@@ -1595,7 +1595,12 @@ sub lookup_geoip_location {
 	my $record = $self->lookup_geoip_record($ip);
 	return undef unless defined $record;
 	
-	my @location_parts = ( $record->city, $record->region_name, $record->country_name );
+	my @subdivision_names;
+	foreach my $subdivision ($record->subdivisions) {
+		unshift @subdivision_names, $subdivision->name;
+	}
+	my @location_parts = ($record->city->name, @subdivision_names, $record->country->name);
+	
 	my $location = join ', ', grep { defined } @location_parts;
 	return $location;
 }
@@ -1609,9 +1614,9 @@ sub lookup_geoip_weather {
 	my $record = $self->lookup_geoip_record($ip);
 	return undef unless defined $record;
 	
-	if ($record->country_code eq 'US') { return $record->postal_code; }
+	if ($record->country->iso_code eq 'US' and defined $record->postal->code) { return $record->postal->code; }
 	else {
-		my @location_parts = ($record->city, $record->country_name);
+		my @location_parts = ($record->city->name, $record->country->name);
 		my $location = join ', ', grep { defined } @location_parts;
 		return $location;
 	}
