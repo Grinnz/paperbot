@@ -1578,7 +1578,7 @@ sub lookup_geoip_record {
 	
 	if (is_ipv4($ip) or is_ipv6($ip)) {
 		my $geoip = $self->geoip;
-		my $record = eval { $geoip->city(ip => $ip); };
+		my $record = eval { $geoip->city_isp_org(ip => $ip); };
 		warn $@ and return undef if $@;
 		return $record;
 	} else {
@@ -1602,6 +1602,13 @@ sub lookup_geoip_location {
 	my @location_parts = ($record->city->name, @subdivision_names, $record->country->name);
 	
 	my $location = join ', ', grep { defined } @location_parts;
+	
+	my $isp = $record->traits->isp;
+	my $org = $record->traits->organization;
+	
+	$location .= " [ $isp ]" if defined $isp;
+	$location .= " [ $org ]" if defined $org;
+	
 	return $location;
 }
 
