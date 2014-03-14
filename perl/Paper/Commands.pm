@@ -1631,6 +1631,9 @@ my %functions = (
 	'asin' => { 'args' => 1, 'sub' => sub { asin($_[0]) } },
 	'acos' => { 'args' => 1, 'sub' => sub { acos($_[0]) } },
 	'atan' => { 'args' => 1, 'sub' => sub { atan($_[0]) } },
+	'int' => { 'args' => 1, 'sub' => sub { int($_[0]) } },
+	'floor' => { 'args' => 1, 'sub' => sub { POSIX::floor($_[0]) } },
+	'ceil' => { 'args' => 1, 'sub' => sub { POSIX::ceil($_[0]) } }
 );
 
 my $operators_re = '[-+*/^]';
