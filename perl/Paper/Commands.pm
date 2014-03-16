@@ -355,7 +355,7 @@ sub say_weather {
 		my $temp_f = $current->{'temp_f'};
 		my $temp_c = $current->{'temp_c'};
 		if (defined $temp_f or defined $temp_c) {
-			my $deg = chr(0xb0);
+			my $deg = "\N{U+00B0}";
 			my $temp_str = "$temp_f${deg}F / $temp_c${deg}C";
 			push @weather_strings, $temp_str;
 		}
@@ -363,7 +363,7 @@ sub say_weather {
 		my $feelslike_f = $current->{'feelslike_f'};
 		my $feelslike_c = $current->{'feelslike_c'};
 		if (defined $feelslike_f or defined $feelslike_c) {
-			my $deg = chr(0xb0);
+			my $deg = "\N{U+00B0}";
 			my $feelslike_str = "Feels like $feelslike_f${deg}F / $feelslike_c${deg}C";
 			push @weather_strings, $feelslike_str;
 		}
@@ -445,7 +445,7 @@ sub say_forecast {
 				my $high_f = $high->{'fahrenheit'};
 				my $high_c = $high->{'celsius'};
 				
-				my $deg = chr(0xb0);
+				my $deg = "\N{U+00B0}";
 				my $high_str = "High $high_f${deg}F / $high_c${deg}C";
 				
 				push @day_strings, $high_str;
@@ -456,7 +456,7 @@ sub say_forecast {
 				my $low_f = $low->{'fahrenheit'};
 				my $low_c = $low->{'celsius'};
 				
-				my $deg = chr(0xb0);
+				my $deg = "\N{U+00B0}";
 				my $low_str = "Low $low_f${deg}F / $low_c${deg}C";
 				push @day_strings, $low_str;
 			}
