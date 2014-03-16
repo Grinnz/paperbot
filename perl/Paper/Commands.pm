@@ -322,84 +322,63 @@ sub say_weather {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
-	my $weather = $self->search_weatherbug_weather_zipcode($args);
-	unless (defined $weather) {
-		my $locations = $self->search_weatherbug_location($args);
-		if (defined $locations) {
-			my $list = $locations->findnodes("aws:location");
-			if (defined $list and $list->size) {
-				my $location = $list->shift;
-				my $zipcode = $location->getAttribute('zipcode');
-				my $citycode = $location->getAttribute('citycode');
-				
-				if (defined $zipcode and length $zipcode) {
-					$weather = $self->search_weatherbug_weather_zipcode($zipcode);
-				} elsif (defined $citycode and length $citycode) {
-					$weather = $self->search_weatherbug_weather_citycode($citycode);
-				}
-			}
-		}
+	my $weather;
+	my $location = $self->search_wunderground_location($args);
+	if (defined $location) {
+		$weather = $self->search_wunderground_weather($location);
 	}
 	
 	if (defined $weather) {
-		my $station = $weather->findnodes("aws:station");
+		my $location = $weather->{'location'} // $weather->{'current_observation'}{'display_location'};
 		my $location_str = "";
-		if (defined $station) {
-			$station = $station->shift;
-			my $city = $station->getAttribute('city');
-			my $state = $station->getAttribute('state');
-			my $zip = $station->getAttribute('zipcode');
-			my $country = $station->getAttribute('country');
+		if (defined $location) {
+			my $city = $location->{'city'};
+			my $state = $location->{'state'};
+			my $zip = $location->{'zip'};
+			my $country = $location->{'country_name'};
 			
 			$location_str = $city // "";
-			$location_str .= ", $state" if defined $state;
-			$location_str .= ", $country" if defined $country and (!defined $state or $country ne $state);
-			$location_str .= " ($zip)" if defined $zip and length $zip;
+			$location_str .= ", $state" if defined $state and length $state;
+			$location_str .= ", $country" if defined $country and length $country;
+			$location_str .= " ($zip)" if defined $zip and length $zip and $zip ne '00000';
 		}
 		
 		my @weather_strings;
 		
-		my $temp = $weather->findnodes("aws:temp");
-		if (defined $temp and $temp->size) {
-			$temp = $temp->shift;
-			my $temperature = $temp->textContent;
-			my $temp_units = decode_entities($temp->getAttribute('units'));
-			my $temp_str = "$temperature$temp_units";
-			
-			my $temp_alt_units = ($temp_units =~ /f/i) ? 'C' : 'F';
-			my ($type, $result, $in_unit, $out_unit) = $self->do_conversion($temperature, $temp_units, $temp_alt_units);
-			if (defined $result and defined $out_unit) {
-				$temp_str .= sprintf " / %.1f%s", $result, $out_unit;
-			}
+		my $current = $weather->{'current_observation'} // {};
+		
+		my $condition = $current->{'weather'};
+		if (defined $condition) {
+			push @weather_strings, $condition;
+		}
+		
+		my $temp_f = $current->{'temp_f'};
+		my $temp_c = $current->{'temp_c'};
+		if (defined $temp_f or defined $temp_c) {
+			my $deg = chr(0xb0);
+			my $temp_str = "$temp_f${deg}F / $temp_c${deg}C";
 			push @weather_strings, $temp_str;
 		}
 		
-		my $condition = $weather->findnodes("aws:current-condition");
-		if (defined $condition and $condition->size) {
-			push @weather_strings, $condition->shift->textContent;
+		my $feelslike_f = $current->{'feelslike_f'};
+		my $feelslike_c = $current->{'feelslike_c'};
+		if (defined $feelslike_f or defined $feelslike_c) {
+			my $deg = chr(0xb0);
+			my $feelslike_str = "Feels like $feelslike_f${deg}F / $feelslike_c${deg}C";
+			push @weather_strings, $feelslike_str;
 		}
 		
-		my $rain_today = $weather->findnodes("aws:rain-today");
-		if (defined $rain_today and $rain_today->size) {
-			$rain_today = $rain_today->shift;
-			my $rain = $rain_today->textContent;
-			my $rain_units = decode_entities($rain_today->getAttribute('units'));
-			push @weather_strings, "$rain$rain_units rain today"
-				if looks_like_number($rain) and $rain > 0;
+		my $precip_in = $current->{'precip_today_in'};
+		if (defined $precip_in) {
+			push @weather_strings, "Precipitation $precip_in\"" if looks_like_number($precip_in) and $precip_in > 0;
 		}
 		
-		my $wind_speed = $weather->findnodes("aws:wind-speed");
-		my $wind_direction = $weather->findnodes("aws:wind-direction");
-		if (defined $wind_speed and $wind_speed->size) {
-			$wind_speed = $wind_speed->shift;
-			my $speed = $wind_speed->textContent;
-			my $units = $wind_speed->getAttribute('units');
-			my $direction = "";
-			if (defined $wind_direction and $wind_direction->size) {
-				$direction = $wind_direction->shift->textContent;
-			}
-			push @weather_strings, "Wind $speed$units $direction"
-				if looks_like_number($speed) and $speed > 0;
+		my $wind_speed = $current->{'wind_mph'};
+		my $wind_direction = $current->{'wind_dir'};
+		if (defined $wind_speed) {
+			my $wind = "Wind ${wind_speed}mph";
+			$wind = "$wind $wind_direction" if defined $wind_direction;
+			push @weather_strings, $wind if looks_like_number($wind_speed) and $wind_speed > 0;
 		}
 		
 		my $b_code = chr(2); # how bold is read
@@ -423,106 +402,67 @@ sub say_forecast {
 		$max_days = $2;
 	}
 	
-	my $forecast = $self->search_weatherbug_forecast_zipcode($loc);
-	unless (defined $forecast) {
-		my $locations = $self->search_weatherbug_location($loc);
-		if (defined $locations) {
-			my $list = $locations->findnodes("aws:location");
-			if (defined $list and $list->size) {
-				my $location = $list->shift;
-				my $zipcode = $location->getAttribute('zipcode');
-				my $citycode = $location->getAttribute('citycode');
-				
-				if (defined $zipcode and length $zipcode) {
-					$forecast = $self->search_weatherbug_forecast_zipcode($zipcode);
-				} elsif (defined $citycode and length $citycode) {
-					$forecast = $self->search_weatherbug_forecast_citycode($citycode);
-				}
-			}
-		}
+	my $weather;
+	my $location = $self->search_wunderground_location($loc);
+	if (defined $location) {
+		$weather = $self->search_wunderground_weather($location);
 	}
 	
-	if (defined $forecast) {
+	if (defined $weather) {
 		my $location_str = "";
-		my $location = $forecast->findnodes("aws:location");
-		if (defined $location and $location->size) {
-			$location = $location->shift;
-			my ($city,$state,$zip,$country);
-			my $city_list = $location->findnodes("aws:city");
-			$city = $city_list->shift->textContent if defined $city_list and $city_list->size;
-			my $state_list = $location->findnodes("aws:state");
-			$state = $state_list->shift->textContent if defined $state_list and $state_list->size;
-			my $zip_list = $location->findnodes("aws:zip");
-			$zip = $zip_list->shift->textContent if defined $zip_list and $zip_list->size;
-			my $country_list = $location->findnodes("aws:country");
-			$country = $country_list->shift->textContent if defined $country_list and $country_list->size;
+		my $location = $weather->{'location'};
+		if (defined $location) {
+			my $city = $location->{'city'};
+			my $state = $location->{'state'};
+			my $zip = $location->{'zip'};
+			my $country = $location->{'country_name'};
 			
 			$location_str = $city // "";
-			$location_str .= ", $state" if defined $state;
-			$location_str .= ", $country" if defined $country and (!defined $state or $country ne $state);
-			$location_str .= " ($zip)" if defined $zip and length $zip;
+			$location_str .= ", $state" if defined $state and length $state;
+			$location_str .= ", $country" if defined $country and length $country;
+			$location_str .= " ($zip)" if defined $zip and length $zip and $zip ne '00000';
 		}
 		
 		my @forecast_strings;
 		
-		my $days = $forecast->findnodes("aws:forecast");
-		if (defined $days and $days->size) {
-			$max_days = $days->size if $max_days > $days->size;
-		} else {
-			$max_days = 0;
-		}
+		my $forecastdays = $weather->{'forecast'}{'simpleforecast'}{'forecastday'};
+		
+		$max_days = @$forecastdays if $max_days > @$forecastdays;
 		foreach my $i (1..$max_days) {
-			my $day = $days->get_node($i);
+			my $day = $forecastdays->[$i-1];
 			next unless defined $day;
-			my $desc_list = $day->findnodes("aws:description");
-			my $desc = "";
-			if (defined $desc_list and $desc_list->size) {
-				$desc = $desc_list->shift->textContent;
-			}
+			
+			my $day_name = $day->{'date'}{'weekday'} // "";
 			
 			my @day_strings;
-			my $pred_list = $day->findnodes("aws:short-prediction");
-			if (defined $pred_list and $pred_list->size) {
-				push @day_strings, $pred_list->shift->textContent;
+			my $conditions = $day->{'conditions'};
+			if (defined $conditions) {
+				push @day_strings, $conditions;
 			}
 			
-			my $high = $day->findnodes("aws:high");
-			if (defined $high and $high->size) {
-				$high = $high->shift;
-				my $high_temp = $high->textContent;
-				my $high_units = decode_entities($high->getAttribute('units'));
+			my $high = $day->{'high'};
+			if (defined $high) {
+				my $high_f = $high->{'fahrenheit'};
+				my $high_c = $high->{'celsius'};
 				
-				if (looks_like_number($high_temp)) {
-					my $high_str = "High $high_temp$high_units";
-
-					my $high_alt_units = ($high_units =~ /f/i) ? 'C' : 'F';
-					my ($type, $result, $in_unit, $out_unit) = $self->do_conversion($high_temp, $high_units, $high_alt_units);
-					if (defined $result and defined $out_unit) {
-						$high_str .= sprintf "/%.1f%s", $result, $out_unit;
-					}
-					push @day_strings, $high_str;
-				}
+				my $deg = chr(0xb0);
+				my $high_str = "High $high_f${deg}F / $high_c${deg}C";
+				
+				push @day_strings, $high_str;
 			}
 			
-			my $low = $day->findnodes("aws:low");
-			if (defined $low and $low->size) {
-				$low = $low->shift;
-				my $low_temp = $low->textContent;
-				my $low_units = decode_entities($low->getAttribute('units'));
-				if (looks_like_number($low_temp)) {
-					my $low_str = "Low $low_temp$low_units";
-					
-					my $low_alt_units = ($low_units =~ /f/i) ? 'C' : 'F';
-					my ($type, $result, $in_unit, $out_unit) = $self->do_conversion($low_temp, $low_units, $low_alt_units);
-					if (defined $result and defined $out_unit) {
-						$low_str .= sprintf "/%.1f%s", $result, $out_unit;
-					}
-					push @day_strings, $low_str;
-				}
+			my $low = $day->{'low'};
+			if (defined $low) {
+				my $low_f = $low->{'fahrenheit'};
+				my $low_c = $low->{'celsius'};
+				
+				my $deg = chr(0xb0);
+				my $low_str = "Low $low_f${deg}F / $low_c${deg}C";
+				push @day_strings, $low_str;
 			}
 			
 			my $b_code = chr(2); # how bold is read
-			push @forecast_strings, "$b_code$desc$b_code: " . join(', ', @day_strings);
+			push @forecast_strings, "$b_code$day_name$b_code: " . join(', ', @day_strings);
 		}
 		
 		my $b_code = chr(2); # how bold is read

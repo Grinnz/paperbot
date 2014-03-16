@@ -38,6 +38,7 @@ use constant {
 };
 
 use constant QUEUE_TIMEOUT => 60;
+use constant CACHE_WEATHER_EXPIRATION => 600;
 
 use constant DEFAULT_CONFIG => {
 	debug => 1,
@@ -1256,121 +1257,84 @@ sub search_wikipedia_content {
 	return $data->{'query'}{'pages'}{$pageid};
 }
 
-sub search_weatherbug_weather_zipcode {
+sub search_wunderground_weather {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
-	my $zip = shift;
-	croak "No zip code given" unless defined $zip;
+	my $query = shift;
+	croak "No location given" unless defined $query;
 	
-	my $apicode = $self->config_var('weatherbugkey');
-	return undef unless defined $apicode;
-	my $request = "http://$apicode.api.wxbug.net/getLiveCompactWeatherRSS.aspx?ACode=$apicode&zipCode=$zip&OutputType=1";
+	my $data = $self->cache_weather_results($query);
 	
-	my $result = get($request);
-	return undef unless defined $result and $result =~ /^\</;
+	unless (defined $data) {
+		my $query_esc = uri_escape($query);
+		
+		my $apicode = $self->config_var('wundergroundkey');
+		return undef unless defined $apicode;
+		my $request = "http://api.wunderground.com/api/$apicode/conditions/forecast/geolookup/q/${query_esc}.json";
+		
+		my $result = get($request);
+		return undef unless defined $result;
+		
+		$data = eval { decode_json($result); };
+		warn $@ and return undef if $@;
+		
+		$self->cache_weather_results($query, $data);
+	}
 	
-	my $xml = $self->xml;
-	my $data = eval { $xml->load_xml('string' => $result); };
-	warn $@ and return undef if $@;
-	return undef unless defined $data;
-	
-	my $weather = $data->documentElement->findnodes("/aws:weather");
-	return undef unless defined $weather and $weather->size;
-	return $weather->shift;
+	return $data;
 }
 
-sub search_weatherbug_weather_citycode {
+sub search_wunderground_weather_ip {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
-	my $city = shift;
-	croak "No city code given" unless defined $city;
+	my $ip = shift;
+	croak "No IP address given" unless defined $ip;
 	
-	my $apicode = $self->config_var('weatherbugkey');
-	return undef unless defined $apicode;
-	my $request = "http://$apicode.api.wxbug.net/getLiveCompactWeatherRSS.aspx?ACode=$apicode&cityCode=$city&OutputType=1";
+	my $data = $self->cache_weather_results("ip:$ip");
 	
-	my $result = get($request);
-	return undef unless defined $result and $result =~ /^\</;
-
-	my $xml = $self->xml;
-	my $data = eval { $xml->load_xml('string' => $result); };
-	warn $@ and return undef if $@;
-	return undef unless defined $data;
+	unless (defined $data) {
+		my $apicode = $self->config_var('wundergroundkey');
+		return undef unless defined $apicode;
+		my $request = "http://api.wunderground.com/api/$apicode/conditions/forecast/geolookup/q/autoip.json?geo_ip=$ip";
+		
+		my $result = get($request);
+		return undef unless defined $result;
+		
+		$data = eval { decode_json($result); };
+		warn $@ and return undef if $@;
+		
+		$self->cache_weather_results("ip:$ip", $data);
+	}
 	
-	my $weather = $data->documentElement->findnodes("/aws:weather");
-	return undef unless defined $weather and $weather->size;
-	return $weather->shift;
+	return $data;
 }
 
-sub search_weatherbug_forecast_zipcode {
+sub search_wunderground_location {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
-	my $zip = shift;
-	croak "No zip code given" unless defined $zip;
+	my $query = shift;
+	croak "No query given" unless defined $query;
 	
-	my $apicode = $self->config_var('weatherbugkey');
-	return undef unless defined $apicode;
-	my $request = "http://$apicode.api.wxbug.net/getForecastRSS.aspx?ACode=$apicode&zipCode=$zip&OutputType=1";
-	
-	my $result = get($request);
-	return undef unless defined $result and $result =~ /^\</;
-
-	my $xml = $self->xml;
-	my $data = eval { $xml->load_xml('string' => $result); };
-	warn $@ and return undef if $@;
-	return undef unless defined $data;
-	
-	my $forecasts = $data->documentElement->findnodes("/aws:weather/aws:forecasts");
-	return undef unless defined $forecasts and $forecasts->size;
-	return $forecasts->shift;
-}
-
-sub search_weatherbug_forecast_citycode {
-	my $self = shift;
-	croak "Not called as an object method" unless defined $self;
-	my $city = shift;
-	croak "No city code given" unless defined $city;
-	
-	my $apicode = $self->config_var('weatherbugkey');
-	return undef unless defined $apicode;
-	my $request = "http://$apicode.api.wxbug.net/getForecastRSS.aspx?ACode=$apicode&cityCode=$city&OutputType=1";
+	$query = uri_escape($query);
+	my $request = "http://autocomplete.wunderground.com/aq?h=0&query=$query";
 	
 	my $result = get($request);
-	return undef unless defined $result and $result =~ /^\</;
-
-	my $xml = $self->xml;
-	my $data = eval { $xml->load_xml('string' => $result); };
+	return undef unless defined $result;
+	
+	my $data = eval { decode_json($result); };
 	warn $@ and return undef if $@;
-	return undef unless defined $data;
 	
-	my $forecasts = $data->documentElement->findnodes("/aws:weather/aws:forecasts");
-	return undef unless defined $forecasts and $forecasts->size;
-	return $forecasts->shift;
-}
-
-sub search_weatherbug_location {
-	my $self = shift;
-	croak "Not called as an object method" unless defined $self;
-	my $location = shift;
-	croak "No location given" unless defined $location;
-	
-	my $searchTerm = uri_escape($location);
-	
-	my $apicode = $self->config_var('weatherbugkey');
-	return undef unless defined $apicode;
-	my $request = "http://$apicode.api.wxbug.net/getLocationsXML.aspx?ACode=$apicode&SearchString=$searchTerm";
-	
-	my $result = get($request);
-	return undef unless defined $result and $result =~ /^\</;
-
-	my $xml = $self->xml;
-	my $data = eval { $xml->load_xml('string' => $result); };
-	warn $@ and return undef if $@;
-	return undef unless defined $data;
-	
-	my $locations = $data->documentElement->findnodes("/aws:weather/aws:locations");
-	return undef unless defined $locations and $locations->size;
-	return $locations->shift;
+	my $locs = $data->{'RESULTS'} // return undef;
+	foreach my $loc (@$locs) {
+		next unless $loc->{'type'} eq 'city';
+		next unless defined $loc->{'lat'} and defined $loc->{'lon'};
+		next unless $loc->{'lat'} >= -90 and $loc->{'lat'} <= 90
+			and $loc->{'lon'} >= -180 and $loc->{'lon'} <= 180;
+		if (defined $loc->{'l'} and $loc->{'l'} =~ m!/q/(.+)!) {
+			return $1;
+		}
+	}
+	return undef;
 }
 
 sub translate {
@@ -2042,6 +2006,28 @@ sub cache_search_clear {
 	}
 	
 	return 1;
+}
+
+sub cache_weather_results {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $code = shift;
+	croak "No location code given" unless defined $code;
+	
+	if (@_) {
+		my $results = shift;
+		$self->{'cache'}{'weather'}{$code}{'location'} = $results->{'location'};
+		$self->{'cache'}{'weather'}{$code}{'forecast'} = $results->{'forecast'};
+		$self->{'cache'}{'weather'}{$code}{'current_observation'} = $results->{'current_observation'};
+		$self->{'cache'}{'weather'}{$code}{'expiration'} = time+CACHE_WEATHER_EXPIRATION;
+	}
+	
+	return undef unless exists $self->{'cache'}{'weather'}{$code};
+	if ($self->{'cache'}{'weather'}{$code}{'expiration'} <= time) {
+		delete $self->{'cache'}{'weather'}{$code};
+		return undef;
+	}
+	return $self->{'cache'}{'weather'}{$code};
 }
 
 sub print_debug {
