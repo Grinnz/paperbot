@@ -1585,12 +1585,14 @@ sub lookup_geoip_weather {
 	my $record = $self->lookup_geoip_record($ip);
 	return undef unless defined $record;
 	
-	if ($record->country->iso_code eq 'US' and defined $record->postal->code) { return $record->postal->code; }
-	else {
-		my @location_parts = ($record->city->name, $record->country->name);
-		my $location = join ', ', grep { defined } @location_parts;
-		return $location;
+	my @location_parts = ($record->city->name);
+	if ($record->country->iso_code eq 'US') {
+		push @location_parts, $record->most_specific_subdivision->iso_code;
+	} else {
+		push @location_parts, $record->country->name;
 	}
+	my $location = join ', ', grep { defined } @location_parts;
+	return $location;
 }
 
 sub search_wolframalpha {
