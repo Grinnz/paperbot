@@ -1198,7 +1198,7 @@ sub search_youtube {
 	$safesearch = 'strict' unless defined $safesearch;
 	$safesearch = $safesearch ? 'strict' : 'off';
 	
-	$q = uri_escape($q);
+	$q = uri_escape_utf8($q);
 	$q =~ s/(\s|\%20)+/+/g;
 	
 	my $request = "http://gdata.youtube.com/feeds/api/videos?q=$q&max-results=$numresults&safeSearch=strict&v=2.0";
@@ -1238,7 +1238,7 @@ sub search_wikipedia_titles {
 	my $q = shift;
 	croak "Invalid search query" unless defined $q;
 	
-	my $searchTerm = uri_escape($q);
+	my $searchTerm = uri_escape_utf8($q);
 	
 	my $request = "http://en.wikipedia.org/w/api.php?format=json&action=opensearch&search=$searchTerm";
 	
@@ -1257,7 +1257,7 @@ sub search_wikipedia_content {
 	my $title = shift;
 	croak "Invalid page title" unless defined $title;
 	
-	my $getTitle = uri_escape($title);
+	my $getTitle = uri_escape_utf8($title);
 	
 	my $numChars = 250;
 	my $request = "http://en.wikipedia.org/w/api.php?format=json&action=query&redirects=1&prop=extracts|info&explaintext=1&exsectionformat=plain&exchars=$numChars&inprop=url&titles=$getTitle";
@@ -1282,7 +1282,7 @@ sub search_wunderground_weather {
 	my $data = $self->cache_weather_results($query);
 	
 	unless (defined $data) {
-		my $query_esc = uri_escape($query);
+		my $query_esc = uri_escape_utf8($query);
 		
 		my $apicode = $self->config_var('wundergroundkey');
 		return undef unless defined $apicode;
@@ -1331,7 +1331,7 @@ sub search_wunderground_location {
 	my $query = shift;
 	croak "No query given" unless defined $query;
 	
-	$query = uri_escape($query);
+	$query = uri_escape_utf8($query);
 	my $request = "http://autocomplete.wunderground.com/aq?h=0&query=$query";
 	
 	my $result = get($request);
@@ -1359,7 +1359,7 @@ sub translate {
 	my ($phrase, $from, $to) = @_;
 	croak "Invalid parameters for translate" unless defined $phrase and defined $from and defined $to;
 	
-	my $escaped_phrase = uri_escape($phrase);
+	my $escaped_phrase = uri_escape_utf8($phrase);
 	
 	my $lwp = $self->lwp;
 	
@@ -1390,7 +1390,7 @@ sub translate_detect {
 	my $phrase = shift;
 	croak "Invalid phrase to detect" unless defined $phrase;
 	
-	my $escaped_phrase = uri_escape($phrase);
+	my $escaped_phrase = uri_escape_utf8($phrase);
 	
 	my $lwp = $self->lwp;
 	
@@ -1420,7 +1420,7 @@ sub translate_speak {
 	my ($phrase, $lang) = @_;
 	croak "Invalid parameters" unless defined $phrase and defined $lang;
 	
-	my $escaped_phrase = uri_escape($phrase);
+	my $escaped_phrase = uri_escape_utf8($phrase);
 	
 	my $lwp = $self->lwp;
 	
@@ -1479,7 +1479,7 @@ sub search_twitter {
 	my $access_token = $self->twitter_access_token;
 	return undef unless defined $access_token;
 	
-	my $q = uri_escape($term);
+	my $q = uri_escape_utf8($term);
 	my $count = 4;
 	
 	my $request = "https://api.twitter.com/1.1/search/tweets.json?q=$q&count=$count&include_entities=false";
@@ -1620,7 +1620,7 @@ sub search_wolframalpha {
 	
 	my $appid = $self->config_var('wolframalphaid');
 	
-	$query = uri_escape($query);
+	$query = uri_escape_utf8($query);
 	
 	my $request = "http://api.wolframalpha.com/v2/query?input=$query&appid=$appid&format=plaintext";
 	if (defined $ip) {

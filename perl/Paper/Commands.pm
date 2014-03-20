@@ -86,7 +86,7 @@ my %command = (
 	'spellmode' => { func => 'cmd_spellmode', access => ACCESS_MASTER, on => 1, strip => 1 },
 	'youtube' => { func => 'cmd_youtube', access => ACCESS_NONE, on => 1, strip => 1 },
 	'youtubeinfo' => { func => 'cmd_youtubeinfo', access => ACCESS_NONE, on => 1, strip => 1 },
-	'calc' => { func => 'cmd_calc', access => ACCESS_VOICE, on => 1, strip => 0 },
+	'calc' => { func => 'cmd_calc', access => ACCESS_NONE, on => 1, strip => 0 },
 	'save' => { func => 'cmd_save', access => ACCESS_MASTER, on => 1, strip => 0 },
 	'reload' => { func => 'cmd_reload', access => ACCESS_MASTER, on => 1, strip => 0 },
 	'joinall' => { func => 'cmd_joinall', access => ACCESS_BOTADMIN, on => 1, strip => 0 },
