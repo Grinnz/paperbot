@@ -15,6 +15,7 @@ use Text::Aspell;
 use REST::Google::Search::Web;
 use Sys::Statistics::Linux::SysInfo;
 use GeoIP2::Database::Reader;
+use Geo::METAR;
 use XML::Atom::Entry;
 use XML::Atom::Feed;
 use XML::LibXML;
@@ -30,11 +31,12 @@ use MIME::Base64;
 use Paper::IRC;
 use Paper::Commands;
 
-use version; our $VERSION = version->declare('v1.3.0');
+use version; our $VERSION = version->declare('v1.3.1');
 
 use constant {
 	IRC_SOCIALGAMER => 1,
-	IRC_GAMESURGE => 2
+	IRC_GAMESURGE => 2,
+	IRC_FREENODE => 3
 };
 
 use constant QUEUE_TIMEOUT => 60;
@@ -73,7 +75,7 @@ BEGIN {
 	REST::Google::Search::Web->http_referer('http://grinnz.com');
 }
 
-our @EXPORT = qw/IRC_SOCIALGAMER IRC_GAMESURGE/;
+our @EXPORT = qw/IRC_SOCIALGAMER IRC_GAMESURGE IRC_FREENODE/;
 
 sub new {
 	my $class = shift;
@@ -90,6 +92,8 @@ sub new {
 		$ircclass = 'Paper::IRC::SocialGamer';
 	} elsif ($irctype == IRC_GAMESURGE) {
 		$ircclass = 'Paper::IRC::GameSurge';
+	} elsif ($irctype == IRC_FREENODE) {
+		$ircclass = 'Paper::IRC::Freenode';
 	}
 	eval "require $ircclass";
 	$ircclass->import;
@@ -342,6 +346,18 @@ sub geoip {
 	}
 	
 	return $self->{'geoip'};
+}
+
+sub metar {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	
+	unless (defined $self->{'metar'}) {
+		my $metar = Geo::METAR->new;
+		$self->{'metar'} = $metar;
+	}
+	
+	return $self->{'metar'};
 }
 
 sub ms_access_token {
