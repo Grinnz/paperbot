@@ -1552,7 +1552,7 @@ my %functions = (
 	'*' => { 'args' => 2, 'sub' => sub { $_[0] * $_[1] } },
 	'/' => { 'args' => 2, 'sub' => sub { $_[0] / $_[1] } },
 	'uminus' => { 'args' => 1, 'sub' => sub { -$_[0] } },
-	'^' => { 'args' => 2, 'sub' => sub { $_[0] ** $_[1] } },
+	'^' => { 'args' => 2, 'sub' => sub { cplx($_[0]) ** $_[1] } },
 #	'!' => { 'args' => 1, 'sub' => sub { },
 	'sqrt' => { 'args' => 1, 'sub' => sub { sqrt($_[0]) } },
 	'pi' => { 'args' => 0, 'sub' => sub { pi } },
