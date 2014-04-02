@@ -2492,9 +2492,12 @@ my %lang_name_to_code = (
 	'italian' => 'it',
 	'japanese' => 'ja',
 	'korean' => 'ko',
+	'klingon' => 'tlh',
+	'klingon (piqad)' => 'tlh-Qaak',
 	'latvian' => 'lv',
 	'lithuanian' => 'lt',
 	'malay' => 'ms',
+	'maltese' => 'mt',
 	'norwegian' => 'no',
 	'persian (farsi)' => 'fa',
 	'persian' => 'fa',
@@ -2511,7 +2514,9 @@ my %lang_name_to_code = (
 	'turkish' => 'tr',
 	'ukrainian' => 'uk',
 	'urdu' => 'ur',
-	'vietnamese' => 'vi'
+	'vietnamese' => 'vi',
+	'welsh' => 'cy',
+	'cymraeg' => 'cy'
 );
 
 my %lang_code_to_name = (
@@ -2537,10 +2542,13 @@ my %lang_code_to_name = (
 	'id' => 'Indonesian',
 	'it' => 'Italian',
 	'ja' => 'Japanese',
+	'tlh' => 'Klingon',
+	'tlh-qaak' => 'Klingon (pIqaD)',
 	'ko' => 'Korean',
 	'lv' => 'Latvian',
 	'lt' => 'Lithuanian',
 	'ms' => 'Malay',
+	'mt' => 'Maltese',
 	'no' => 'Norwegian',
 	'fa' => 'Persian (Farsi)',
 	'pl' => 'Polish',
@@ -2555,7 +2563,8 @@ my %lang_code_to_name = (
 	'tr' => 'Turkish',
 	'uk' => 'Ukrainian',
 	'ur' => 'Urdu',
-	'vi' => 'Vietnamese'
+	'vi' => 'Vietnamese',
+	'cy' => 'Welsh'
 );
 
 sub translator_lang_code_exists {
@@ -2727,7 +2736,7 @@ sub cmd_translationparty {
 	
 	$self->print_debug("Running translation party for \"$phrase\" between $from_code and $to_code");
 	
-	my $max_tries = 30;
+	my $max_tries = 20;
 	my $start_phrase = $phrase;
 	my ($translated_phrase, $returned_phrase);
 	my $equilibrium_reached = 0;
@@ -2752,7 +2761,7 @@ sub cmd_translationparty {
 	
 	if ($equilibrium_reached) {
 		$self->print_debug("Equilibrium: $returned_phrase | $translated_phrase");
-		$irc->yield(privmsg => $channel => "Translation Party equilibrium ($from_name | $to_name): $returned_phrase | $translated_phrase");
+		$irc->yield(privmsg => $channel => "Translation Party equilibrium after $equilibrium_reached hop(s) ($from_name | $to_name): $returned_phrase | $translated_phrase");
 	} else {
 		$irc->yield(privmsg => $channel => "Translation Party equilibrium not reached");
 	}
