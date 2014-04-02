@@ -111,6 +111,7 @@ my %command = (
 	'locate' => { func => 'cmd_locate', access => ACCESS_VOICE, on => 1, strip => 1 },
 	'wiki' => { func => 'cmd_wiki', access => ACCESS_NONE, on => 1, strip => 1 },
 	'translate' => { func => 'cmd_translate', access => ACCESS_NONE, on => 1, strip => 1 },
+	'translationparty' => { func => 'cmd_translationparty', access => ACCESS_NONE, on => 1, strip => 1 },
 	'speak' => { func => 'cmd_speak', access => ACCESS_VOICE, on => 1, strip => 1 },
 	'twitter' => { func => 'cmd_twitter', access => ACCESS_NONE, on => 1, strip => 1 },
 	'wolframalpha' => { func => 'cmd_wolframalpha', access => ACCESS_NONE, on => 1, strip => 1 }
@@ -2650,6 +2651,110 @@ sub cmd_translate {
 		$irc->yield(privmsg => $channel => "Translated from $from_name to $to_name: $translated_phrase");
 	} else {
 		$irc->yield(privmsg => $channel => "Error translating phrase");
+	}
+}
+
+sub cmd_translationparty {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$channel = $sender unless $channel;
+	
+	my $phrase;
+	my $from;
+	my $to;
+	if ($args =~ /^\s*("|')(.+?)\1\s+from\s+(.+?)(\s+to\s+(.+?))?\s*$/i) {
+		$phrase = $2;
+		$from = $3;
+		$to = $5 if defined $5 and length $5;
+	} elsif ($args =~ /^\s*("|')(.+?)\1\s+to\s+(.+?)(\s+from\s+(.+?))?\s*$/i) {
+		$phrase = $2;
+		$to = $3;
+		$from = $5 if defined $5 and length $5;
+	} elsif ($args =~ /^\s*("|')(.+?)\1/i) {
+		$phrase = $2;
+	} elsif ($args =~ /^(.+?)\s+from\s+(.+?)(\s+to\s+(.+?))?\s*$/i) {
+		$phrase = $1;
+		$from = $2;
+		$to = $4 if defined $4 and length $4;
+	} elsif ($args =~ /^(.+?)\s+to\s+(.+?)(\s+from\s+(.+?))?\s*$/i) {
+		$phrase = $1;
+		$to = $2;
+		$from = $4 if defined $4 and length $4;
+	} else {
+		$phrase = $args;
+	}
+	
+	unless (defined $from) {
+		my $detected = $self->translate_detect($phrase);
+		if (defined $detected) {
+			$from = $detected;
+		} else {
+			$irc->yield(privmsg => $channel => "Unable to detect language of \"$phrase\"");
+			return;
+		}
+	}
+	
+	my $from_code;
+	if (translator_lang_code_exists($from)) {
+		$from_code = $from;
+	} elsif (my $code = translator_lang_name_to_code($from)) {
+		$from_code = $code;
+	} else {
+		$irc->yield(privmsg => $channel => "Unknown language \"$from\"");
+		return;
+	}
+	
+	unless (defined $to) {
+		if ($from_code eq 'en') {
+			$to = 'ja';
+		} else {
+			$to = 'en';
+		}
+	}
+	
+	my $to_code;
+	if (translator_lang_code_exists($to)) {
+		$to_code = $to;
+	} elsif (my $code = translator_lang_name_to_code($to)) {
+		$to_code = $code;
+	} else {
+		$irc->yield(privmsg => $channel => "Unknown language \"$to\"");
+		return;
+	}
+	
+	my $from_name = translator_lang_code_to_name($from_code) // '';
+	my $to_name = translator_lang_code_to_name($to_code) // '';
+	
+	$self->print_debug("Running translation party for \"$phrase\" between $from_code and $to_code");
+	
+	my $max_tries = 30;
+	my $start_phrase = $phrase;
+	my ($translated_phrase, $returned_phrase);
+	my $equilibrium_reached = 0;
+	foreach my $i (1..$max_tries) {
+		$translated_phrase = $self->translate($start_phrase, $from_code, $to_code);
+		unless (defined $translated_phrase) {
+			$irc->yield(privmsg => $channel => "Error translating phrase");
+			return;
+		}
+		$returned_phrase = $self->translate($translated_phrase, $to_code, $from_code);
+		unless (defined $returned_phrase) {
+			$irc->yield(privmsg => $channel => "Error translating phrase");
+			return;
+		}
+		if ($returned_phrase eq $start_phrase) {
+			$equilibrium_reached = $i;
+			last;
+		} else {
+			$start_phrase = $returned_phrase;
+		}
+	}
+	
+	if ($equilibrium_reached) {
+		$self->print_debug("Equilibrium: $returned_phrase | $translated_phrase");
+		$irc->yield(privmsg => $channel => "Translation Party equilibrium ($from_name | $to_name): $returned_phrase | $translated_phrase");
+	} else {
+		$irc->yield(privmsg => $channel => "Translation Party equilibrium not reached");
 	}
 }
 
