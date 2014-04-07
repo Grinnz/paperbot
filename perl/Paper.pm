@@ -1480,7 +1480,7 @@ sub search_twitter {
 	return undef unless defined $access_token;
 	
 	my $q = uri_escape_utf8($term);
-	my $count = 4;
+	my $count = 15;
 	
 	my $request = "https://api.twitter.com/1.1/search/tweets.json?q=$q&count=$count&include_entities=false";
 	
