@@ -27,7 +27,8 @@ use constant {
 	ACCESS_MASTER => 6
 };
 
-our @EXPORT = qw/cmds_substr_index command_exists command_strip parse_cmd check_access cmd_queue_info say_userinfo do_conversion do_wolframalpha_query
+our @EXPORT = qw/cmds_substr_index command_exists command_strip parse_cmd check_access
+	cmd_queue_info say_userinfo do_conversion do_wolframalpha_query cmd_deluser
 	ACCESS_NONE ACCESS_VOICE ACCESS_HALFOP ACCESS_OP ACCESS_CHANADMIN ACCESS_BOTADMIN ACCESS_MASTER/;
 
 my %userinfo = (
