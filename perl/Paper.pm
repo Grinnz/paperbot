@@ -1638,6 +1638,28 @@ sub search_wolframalpha {
 	return $data;
 }
 
+sub pyx_random_black {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	
+	my $black_card = "Test ____ Card";
+	
+	return $black_card;
+}
+
+sub pyx_random_white {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $count = shift // 1;
+	
+	$count = int abs $count;
+	$count = 1 if $count < 1 or $count > 5;
+	
+	my $cards = [ map { "Test Card $_" } (1..$count) ];
+	
+	return $cards;
+}
+
 # === Internal use methods ===
 
 sub load_config {

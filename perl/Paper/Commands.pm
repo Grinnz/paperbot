@@ -15,7 +15,7 @@ use Data::Validate::IP qw/is_ipv4 is_ipv6/;
 use Encode qw/decode/;
 use LWP::Simple;
 
-use constant MAX_FORECAST_DAYS => 3;
+use constant MAX_FORECAST_DAYS => 4;
 
 use constant {
 	ACCESS_NONE => 0,
@@ -115,7 +115,8 @@ my %command = (
 	'translationparty' => { func => 'cmd_translationparty', access => ACCESS_NONE, on => 1, strip => 1 },
 	'speak' => { func => 'cmd_speak', access => ACCESS_VOICE, on => 1, strip => 1 },
 	'twitter' => { func => 'cmd_twitter', access => ACCESS_NONE, on => 1, strip => 1 },
-	'wolframalpha' => { func => 'cmd_wolframalpha', access => ACCESS_NONE, on => 1, strip => 1 }
+	'wolframalpha' => { func => 'cmd_wolframalpha', access => ACCESS_NONE, on => 1, strip => 1 },
+	'pyx' => { func => 'cmd_pyx', access => ACCESS_NONE, on => 1, strip => 1 }
 );
 
 sub cmds_structure {
@@ -3021,6 +3022,34 @@ sub do_wolframalpha_query {
 	} else {
 		$irc->yield(privmsg => $channel => "Error querying Wolfram Alpha");
 	}
+}
+
+sub cmd_pyx {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$channel = $sender unless $channel;
+	
+	my $black_card = $args;
+	unless ($black_card =~ m/__+/) {
+		$black_card = $self->pyx_random_black;
+	}
+	
+	$self->print_debug("Getting white cards for black card: $black_card");
+	
+	my @blanks = $black_card =~ m/__+/g;
+	my $count = @blanks;
+	
+	my $white_cards = $self->pyx_random_white($count);
+	
+	my $output = $black_card;
+	my $u_code = chr(hex('0x1f'));
+	foreach my $white_card (@$white_cards) {
+		$output =~ s/__+/_${u_code}$white_card${u_code}_/;
+	}
+	
+	$self->print_debug("Filled in: $output");
+	
+	$irc->yield(privmsg => $channel => "PYX Match: $output");
 }
 
 1;
