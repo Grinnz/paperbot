@@ -27,6 +27,7 @@ use JSON::XS;
 use Digest::MD5 qw/md5_hex/;
 use Data::Validate::IP qw/is_ipv4 is_ipv6/;
 use MIME::Base64;
+use DBI;
 
 use Paper::IRC;
 use Paper::Commands;
@@ -293,6 +294,24 @@ sub child_handle_delete {
 	delete $self->{'child_pids'}{$pid};
 	
 	return 1;
+}
+
+sub pyx_dbh {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	
+	my $dbhost = $self->config_var('pyx_dbhost');
+	my $dbuser = $self->config_var('pyx_dbuser');
+	my $dbpass = $self->config_var('pyx_dbpass');
+	my $dbname = $self->config_var('pyx_dbname');
+	warn "Missing PYX database configuration" and return undef
+		unless defined $dbhost and defined $dbuser and defined $dbpass and defined $dbname;
+	
+	my $dbh = DBI->connect_cached("dbi:Pg:dbname=$dbname;host=$dbhost", $dbuser, $dbpass);
+	#warn "Unable to connect to PYX database: ".$DBI::errstr."\n" and return undef unless defined $dbh;
+	return undef unless defined $dbh;
+	
+	return $dbh;
 }
 
 sub speller {
@@ -1638,11 +1657,23 @@ sub search_wolframalpha {
 	return $data;
 }
 
+my @pyx_valid_sets = (1151, 1152, 100211, 1155, 1256, 100154, 100415, 100257,
+	1153, 1154, 1488, 100422, 100049, 100050, 100051, 100312, 100485);
+
 sub pyx_random_black {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
 	
-	my $black_card = "Test ____ Card";
+	my $dbh = $self->pyx_dbh;
+	
+	my $sets_str = join ',', map { '$'.$_ } (1..@pyx_valid_sets);
+	
+	my $black_card = $dbh->selectrow_hashref('SELECT "text", "pick" FROM "black_cards" AS "bc" ' .
+		'INNER JOIN "card_set_black_card" AS "csbc" ON "csbc"."black_card_id"="bc"."id" ' .
+		'WHERE "csbc"."card_set_id" IN ('.$sets_str.') ORDER BY random() LIMIT 1', undef, @pyx_valid_sets);
+	return undef unless defined $black_card;
+	
+	$black_card->{'text'} = strip_pyx($black_card->{'text'});
 	
 	return $black_card;
 }
@@ -1655,9 +1686,20 @@ sub pyx_random_white {
 	$count = int abs $count;
 	$count = 1 if $count < 1 or $count > 5;
 	
-	my $cards = [ map { "Test Card $_" } (1..$count) ];
+	my $dbh = $self->pyx_dbh;
 	
-	return $cards;
+	my $sets_str = join ',', map { '$'.$_ } (1..@pyx_valid_sets);
+	my $limit_param = @pyx_valid_sets+1;
+	
+	my $white_cards = $dbh->selectcol_arrayref('SELECT "text" FROM "white_cards" AS "wc" ' .
+		'INNER JOIN "card_set_white_card" AS "cswc" ON "cswc"."white_card_id"="wc"."id" ' .
+		'WHERE "cswc"."card_set_id" IN ('.$sets_str.') ORDER BY random() LIMIT $'.$limit_param,
+		undef, @pyx_valid_sets, $count);
+	return [] unless defined $white_cards;
+	
+	$_ = strip_pyx($_) foreach @$white_cards;
+	
+	return $white_cards;
 }
 
 # === Internal use methods ===
@@ -2158,6 +2200,21 @@ sub strip_wide {
 		}
 	}
 	return join('', @chars);
+}
+
+sub strip_pyx {
+	my $text = shift // return undef;
+	
+	$text = decode_entities($text);
+	
+	my $b_code = chr(2);
+	$text =~ s!<span>.*?</span>!!g;
+	$text =~ s!</?i>!/!g;
+	$text =~ s!</?b>!$b_code!g;
+	$text =~ s!</?u>!_!g;
+	$text =~ s!<.*?>!!g;
+	
+	return $text;
 }
 
 1;

@@ -3029,22 +3029,38 @@ sub cmd_pyx {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
-	my $black_card = $args;
-	unless ($black_card =~ m/__+/) {
-		$black_card = $self->pyx_random_black;
+	my $black_card_text = $args;
+	my $white_card_count = 1;
+	
+	my ($black_card_text, $white_card_count);
+	if (length $args) {
+		if ($args =~ m/^(.+?)\s+(\d+)$/) {
+			$black_card_text = $1;
+			$white_card_count = $2;
+		} else {
+			$black_card_text = $args;
+			my @blanks = $black_card_text =~ m/__+/g;
+			$white_card_count = @blanks;
+			$white_card_count = 1 if $white_card_count < 1;
+		}
+	} else {
+		my $black_card = $self->pyx_random_black;
+		$black_card_text = $black_card->{'text'};
+		$white_card_count = $black_card->{'pick'};
 	}
 	
-	$self->print_debug("Getting white cards for black card: $black_card");
+	$self->print_debug("Getting white cards for black card: $black_card_text");
 	
-	my @blanks = $black_card =~ m/__+/g;
-	my $count = @blanks;
+	my $white_cards = $self->pyx_random_white($white_card_count);
 	
-	my $white_cards = $self->pyx_random_white($count);
-	
-	my $output = $black_card;
+	my $output = $black_card_text;
 	my $u_code = chr(hex('0x1f'));
 	foreach my $white_card (@$white_cards) {
-		$output =~ s/__+/_${u_code}$white_card${u_code}_/;
+		if ($output =~ m/__+/) {
+			$output =~ s/__+/_${u_code}$white_card${u_code}_/;
+		} else {
+			$output = "$output _${u_code}$white_card${u_code}_";
+		}
 	}
 	
 	$self->print_debug("Filled in: $output");
