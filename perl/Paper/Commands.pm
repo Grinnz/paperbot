@@ -3029,9 +3029,6 @@ sub cmd_pyx {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
-	my $black_card_text = $args;
-	my $white_card_count = 1;
-	
 	my ($black_card_text, $white_card_count);
 	if (length $args) {
 		if ($args =~ m/^(.+?)\s+(\d+)$/) {
