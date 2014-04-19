@@ -2212,7 +2212,9 @@ sub strip_pyx {
 	$text =~ s!</?i>!/!g;
 	$text =~ s!</?b>!$b_code!g;
 	$text =~ s!</?u>!_!g;
+	$text =~ s!<br/?>! !g;
 	$text =~ s!<.*?>!!g;
+	$text =~ s!\r?\n!!g;
 	
 	return $text;
 }
