@@ -2208,7 +2208,7 @@ sub strip_pyx {
 	$text = decode_entities($text);
 	
 	my $b_code = chr(2);
-	$text =~ s!<span>.*?</span>!!g;
+	$text =~ s!<span.*?</span>!!g;
 	$text =~ s!</?i>!/!g;
 	$text =~ s!</?b>!$b_code!g;
 	$text =~ s!</?u>!_!g;
