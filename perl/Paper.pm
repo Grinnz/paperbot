@@ -1657,20 +1657,21 @@ sub search_wolframalpha {
 	return $data;
 }
 
-my @pyx_valid_sets = (1151, 1152, 100211, 1155, 1256, 100154, 100415, 100257,
-	1153, 1154, 1488, 100422, 100049, 100050, 100051, 100312, 100485);
-
 sub pyx_random_black {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
 	
 	my $dbh = $self->pyx_dbh;
 	
-	my $sets_str = join ',', map { '$'.$_ } (1..@pyx_valid_sets);
+	my $valid_sets = $self->config_var('pyx_card_sets');
+	return undef unless defined $valid_sets;
+	my @valid_sets = split ' ', $valid_sets;
+	return undef unless @valid_sets;
+	my $sets_str = join ',', map { '$'.$_ } (1..@valid_sets);
 	
 	my $black_card = $dbh->selectrow_hashref('SELECT "text", "pick" FROM "black_cards" AS "bc" ' .
 		'INNER JOIN "card_set_black_card" AS "csbc" ON "csbc"."black_card_id"="bc"."id" ' .
-		'WHERE "csbc"."card_set_id" IN ('.$sets_str.') ORDER BY random() LIMIT 1', undef, @pyx_valid_sets);
+		'WHERE "csbc"."card_set_id" IN ('.$sets_str.') ORDER BY random() LIMIT 1', undef, @valid_sets);
 	return undef unless defined $black_card;
 	
 	$black_card->{'text'} = strip_pyx($black_card->{'text'});
@@ -1688,13 +1689,17 @@ sub pyx_random_white {
 	
 	my $dbh = $self->pyx_dbh;
 	
-	my $sets_str = join ',', map { '$'.$_ } (1..@pyx_valid_sets);
-	my $limit_param = @pyx_valid_sets+1;
+	my $valid_sets = $self->config_var('pyx_card_sets');
+	return undef unless defined $valid_sets;
+	my @valid_sets = split ' ', $valid_sets;
+	return undef unless @valid_sets;
+	my $sets_str = join ',', map { '$'.$_ } (1..@valid_sets);
+	my $limit_param = @valid_sets+1;
 	
 	my $white_cards = $dbh->selectcol_arrayref('SELECT "text" FROM "white_cards" AS "wc" ' .
 		'INNER JOIN "card_set_white_card" AS "cswc" ON "cswc"."white_card_id"="wc"."id" ' .
 		'WHERE "cswc"."card_set_id" IN ('.$sets_str.') ORDER BY random() LIMIT $'.$limit_param,
-		undef, @pyx_valid_sets, $count);
+		undef, @valid_sets, $count);
 	return [] unless defined $white_cards;
 	
 	$_ = strip_pyx($_) foreach @$white_cards;
