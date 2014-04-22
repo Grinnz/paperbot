@@ -16,6 +16,7 @@ use Encode qw/decode/;
 use LWP::Simple;
 
 use constant MAX_FORECAST_DAYS => 4;
+use constant PYX_MAX_PICK => 3;
 
 use constant {
 	ACCESS_NONE => 0,
@@ -3029,10 +3030,11 @@ sub cmd_pyx {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
-	my ($black_card_text, $white_card_count, $white_card_text);
+	my ($black_card_text, $white_card_count, $white_cards);
 	if (length $args) {
-		if ($args =~ m/^\s*w\s+(.+)$/i) {
-			$white_card_text = $1;
+		if ($args =~ m/^\s*w\s/i) {
+			my @white_cards = $args =~ m/w\s+(.+?)(?=(?:\s+w\s|\s*$))/ig;
+			$white_cards = \@white_cards;
 		} elsif ($args =~ m/^(.+?)\s+(\d+)$/) {
 			$black_card_text = $1;
 			$white_card_count = $2;
@@ -3048,13 +3050,15 @@ sub cmd_pyx {
 		$white_card_count = $black_card->{'pick'};
 	}
 	
-	my $white_cards;
-	if (defined $white_card_text) {
-		$self->print_debug("Getting black card for white card: $white_card_text");
+	if (defined $white_cards and @$white_cards) {
+		my $white_card_text = join ', ', @$white_cards;
+		$self->print_debug("Getting black card for white cards: $white_card_text");
 		
-		my $black_card = $self->pyx_random_black(1);
+		splice @$white_cards, PYX_MAX_PICK if @$white_cards > PYX_MAX_PICK;
+		
+		my $pick = @$white_cards;
+		my $black_card = $self->pyx_random_black($pick);
 		$black_card_text = $black_card->{'text'};
-		$white_cards = [ $white_card_text ];
 	} else {
 		$self->print_debug("Getting white cards for black card: $black_card_text");
 		
