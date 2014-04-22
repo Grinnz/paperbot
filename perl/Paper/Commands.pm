@@ -3029,9 +3029,11 @@ sub cmd_pyx {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
-	my ($black_card_text, $white_card_count);
+	my ($black_card_text, $white_card_count, $white_card_text);
 	if (length $args) {
-		if ($args =~ m/^(.+?)\s+(\d+)$/) {
+		if ($args =~ m/^\s*w\s+(.+)$/i) {
+			$white_card_text = $1;
+		} elsif ($args =~ m/^(.+?)\s+(\d+)$/) {
 			$black_card_text = $1;
 			$white_card_count = $2;
 		} else {
@@ -3046,9 +3048,18 @@ sub cmd_pyx {
 		$white_card_count = $black_card->{'pick'};
 	}
 	
-	$self->print_debug("Getting white cards for black card: $black_card_text");
-	
-	my $white_cards = $self->pyx_random_white($white_card_count);
+	my $white_cards;
+	if (defined $white_card_text) {
+		$self->print_debug("Getting black card for white card: $white_card_text");
+		
+		my $black_card = $self->pyx_random_black(1);
+		$black_card_text = $black_card->{'text'};
+		$white_cards = [ $white_card_text ];
+	} else {
+		$self->print_debug("Getting white cards for black card: $black_card_text");
+		
+		$white_cards = $self->pyx_random_white($white_card_count);
+	}
 	
 	my $output = $black_card_text;
 	my $u_code = chr(hex('0x1f'));

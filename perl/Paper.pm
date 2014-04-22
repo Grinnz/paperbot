@@ -1660,6 +1660,7 @@ sub search_wolframalpha {
 sub pyx_random_black {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
+	my $pick = shift;
 	
 	my $dbh = $self->pyx_dbh;
 	
@@ -1668,10 +1669,18 @@ sub pyx_random_black {
 	my @valid_sets = split ' ', $valid_sets;
 	return undef unless @valid_sets;
 	my $sets_str = join ',', map { '$'.$_ } (1..@valid_sets);
+	my $pick_param = @valid_sets+1;
 	
-	my $black_card = $dbh->selectrow_hashref('SELECT "text", "pick" FROM "black_cards" AS "bc" ' .
+	my $pick_str = '';
+	if (defined $pick and $pick > 0) {
+		$pick_str = 'AND "bc"."pick"=$'.$pick_param.' ';
+		push @valid_sets, $pick;
+	}
+	
+	my $black_card = $dbh->selectrow_hashref('SELECT "bc"."text", "bc"."pick" FROM "black_cards" AS "bc" ' .
 		'INNER JOIN "card_set_black_card" AS "csbc" ON "csbc"."black_card_id"="bc"."id" ' .
-		'WHERE "csbc"."card_set_id" IN ('.$sets_str.') ORDER BY random() LIMIT 1', undef, @valid_sets);
+		'WHERE "csbc"."card_set_id" IN ('.$sets_str.') '.$pick_str.
+		'ORDER BY random() LIMIT 1', undef, @valid_sets);
 	return undef unless defined $black_card;
 	
 	$black_card->{'text'} = strip_pyx($black_card->{'text'});
