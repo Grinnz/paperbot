@@ -1694,7 +1694,8 @@ sub pyx_random_white {
 	my $count = shift // 1;
 	
 	$count = int abs $count;
-	$count = 1 if $count < 1 or $count > 5;
+	$count = 1 if $count < 1;
+	$count = 10 if $count > 10;
 	
 	my $dbh = $self->pyx_dbh;
 	

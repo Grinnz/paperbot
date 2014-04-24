@@ -3032,7 +3032,12 @@ sub cmd_pyx {
 	
 	my ($black_card_text, $white_card_count, $white_cards);
 	if (length $args) {
-		if ($args =~ m/^\s*w\s/i) {
+		if ($args =~ m/^\s*(\d+)\s*$/) {
+			$white_card_count = $1;
+			$white_card_count = PYX_MAX_PICK if $white_card_count > PYX_MAX_PICK;
+			my $black_card = $self->pyx_random_black($white_card_count);
+			$black_card_text = $black_card->{'text'};
+		} elsif ($args =~ m/^\s*w\s/i) {
 			my @white_cards = $args =~ m/w\s+(.+?)(?=(?:\s+w\s|\s*$))/ig;
 			$white_cards = \@white_cards;
 		} elsif ($args =~ m/^(.+?)\s+(\d+)$/) {
