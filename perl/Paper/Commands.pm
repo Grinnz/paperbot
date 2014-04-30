@@ -1543,6 +1543,8 @@ sub cmd_calc {
 my %operators;
 BEGIN {
 	%operators = (
+		'<<' => { 'assoc' => 'left' },
+		'>>' => { 'assoc' => 'left' },
 		'+' => { 'assoc' => 'left' },
 		'-' => { 'assoc' => 'left' },
 		'*' => { 'assoc' => 'left' },
@@ -1553,6 +1555,7 @@ BEGIN {
 	);
 	
 	my @operator_order = (
+		['<<','>>'],
 		['+','-'],
 		['*','/','%'],
 		['uminus'],
@@ -1580,6 +1583,8 @@ BEGIN {
 } 
 
 my %functions = (
+	'<<' => { 'args' => 2, 'sub' => sub { $_[0] << $_[1] } },
+	'>>' => { 'args' => 2, 'sub' => sub { $_[0] >> $_[1] } },
 	'+' => { 'args' => 2, 'sub' => sub { $_[0] + $_[1] } },
 	'-' => { 'args' => 2, 'sub' => sub { $_[0] - $_[1] } },
 	'*' => { 'args' => 2, 'sub' => sub { $_[0] * $_[1] } },
@@ -1605,7 +1610,7 @@ my %functions = (
 	'ceil' => { 'args' => 1, 'sub' => sub { POSIX::ceil($_[0]) } }
 );
 
-my $operators_re = '[-+*/^%]';
+my $operators_re = '(?:-|\\+|\\*|\\/|\\^|%|<<|>>)';
 my $calc_re = qr/((0x[0-9a-f]+|0b[01]+|0[0-7]+)|(\d*\.)?\d+(e-?\d+)?|[()]|\w+|,|$operators_re)/i;
 
 sub calc_parse_expression {
