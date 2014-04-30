@@ -1540,24 +1540,53 @@ sub cmd_calc {
 	}
 }
 
-my %operators = (
-	'+' => { 'equal' => { '+' => 1, '-' => 1 }, 'less' => { '*' => 1, '/' => 1, '^' => 1, 'uminus' => 1 }, 'assoc' => 'left' },
-	'-' => { 'equal' => { '+' => 1, '-' => 1 }, 'less' => { '*' => 1, '/' => 1, '^' => 1, 'uminus' => 1 }, 'assoc' => 'left' },
-	'*' => { 'greater' => { '+' => 1, '-' => 1 }, 'equal' => { '*' => 1, '/' => 1 }, 'less' => { '^' => 1, 'uminus' => 1 }, 'assoc' => 'left' },
-	'/' => { 'greater' => { '+' => 1, '-' => 1 }, 'equal' => { '*' => 1, '/' => 1 }, 'less' => { '^' => 1, 'uminus' => 1 }, 'assoc' => 'left' },
-	'uminus' => { 'greater' => { '+' => 1, '-' => 1, '*' => 1, '/' => 1 }, 'equal' => { 'uminus' => 1 }, 'less' => { '^' => 1 }, 'assoc' => 'right' },
-	'^' => { 'greater' => { '+' => 1, '-' => 1, '*' => 1, '/' => 1, 'uminus' => 1 }, 'equal' => { '^' => 1 }, 'assoc' => 'right' },
-#	'!' => { 'greater' => { '+' => 1, '-' => 1, '*' => 1, '/' => 1, 'uminus' => 1 }, 'equal' => { '!' => 1 }, 'assoc' => 'left' },
-);
+my %operators;
+BEGIN {
+	%operators = (
+		'+' => { 'assoc' => 'left' },
+		'-' => { 'assoc' => 'left' },
+		'*' => { 'assoc' => 'left' },
+		'/' => { 'assoc' => 'left' },
+		'%' => { 'assoc' => 'left' },
+		'uminus' => { 'assoc' => 'right' },
+		'^' => { 'assoc' => 'right' }
+	);
+	
+	my @operator_order = (
+		['+','-'],
+		['*','/','%'],
+		['uminus'],
+		['^']
+	);
+	
+	my (%lower_ops, %higher_ops);
+	$higher_ops{$_} = 1 foreach keys %operators;
+	foreach my $operator_set (@operator_order) {
+		$operator_set = [$operator_set] unless ref $operator_set eq 'ARRAY';
+		
+		my %equal_ops;
+		$equal_ops{$_} = 1 foreach @$operator_set;
+		
+		delete $higher_ops{$_} foreach @$operator_set;
+		
+		foreach my $operator (@$operator_set) {
+			$operators{$operator}{'equal'}{$_} = 1 foreach keys %equal_ops;
+			$operators{$operator}{'lower_than'}{$_} = 1 foreach keys %higher_ops;
+			$operators{$operator}{'higher_than'}{$_} = 1 foreach keys %lower_ops;
+		}
+		
+		$lower_ops{$_} = 1 foreach @$operator_set;
+	}
+} 
 
 my %functions = (
 	'+' => { 'args' => 2, 'sub' => sub { $_[0] + $_[1] } },
 	'-' => { 'args' => 2, 'sub' => sub { $_[0] - $_[1] } },
 	'*' => { 'args' => 2, 'sub' => sub { $_[0] * $_[1] } },
 	'/' => { 'args' => 2, 'sub' => sub { $_[0] / $_[1] } },
+	'%' => { 'args' => 2, 'sub' => sub { $_[0] % $_[1] } },
 	'uminus' => { 'args' => 1, 'sub' => sub { -$_[0] } },
 	'^' => { 'args' => 2, 'sub' => sub { cplx($_[0]) ** $_[1] } },
-#	'!' => { 'args' => 1, 'sub' => sub { },
 	'sqrt' => { 'args' => 1, 'sub' => sub { sqrt($_[0]) } },
 	'pi' => { 'args' => 0, 'sub' => sub { pi } },
 	'i' => { 'args' => 0, 'sub' => sub { i } },
@@ -1576,7 +1605,7 @@ my %functions = (
 	'ceil' => { 'args' => 1, 'sub' => sub { POSIX::ceil($_[0]) } }
 );
 
-my $operators_re = '[-+*/^]';
+my $operators_re = '[-+*/^%]';
 my $calc_re = qr/((0x[0-9a-f]+|0b[01]+|0[0-7]+)|(\d*\.)?\d+(e-?\d+)?|[()]|\w+|,|$operators_re)/i;
 
 sub calc_parse_expression {
@@ -1669,7 +1698,7 @@ sub calc_shunt_operator {
 	my $assoc = $operators{$value}{'assoc'};
 	while (@$oper_stack and $oper_stack->[-1]{'type'} eq 'operator') {
 		my $top_oper = $oper_stack->[-1]{'value'};
-		if ($operators{$value}{'less'}{$top_oper} or ($assoc eq 'left' and $operators{$value}{'equal'}{$top_oper})) {
+		if ($operators{$value}{'lower_than'}{$top_oper} or ($assoc eq 'left' and $operators{$value}{'equal'}{$top_oper})) {
 			push @$expr_queue, (pop @$oper_stack);
 		} else {
 			last;
