@@ -2147,6 +2147,68 @@ sub cmd_xkcd {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
+	my $xkcd;
+	if ($args =~ /^\s*(\d+)\s*$/) {
+		my $num = $1;
+		$xkcd = $self->cache_xkcd($num);
+		unless (defined $xkcd) {
+			$self->update_xkcd($num);
+			$xkcd = $self->cache_xkcd($num);
+			unless (defined $xkcd) {
+				$irc->yield(privmsg => $channel => "Could not find XKCD #$num");
+				return;
+			}
+		}
+	} elsif (length $args) {
+		my @words = split ' ', $args;
+		my $words_str = join '|', (map { "\Q$_\E" } @words);
+		my $xkcds = $self->cache_xkcd;
+		my $transcript_match;
+		foreach my $num (sort { $b <=> $a } keys %$xkcds) {
+			my $check_xkcd = $xkcds->{$num};
+			
+			my $title = $check_xkcd->{'title'} // '';
+			decode_entities($title);
+			if ($title =~ /\b($words_str)\b/i) {
+				$xkcd = $check_xkcd;
+				last;
+			}
+			
+			my $transcript = $check_xkcd->{'transcript'} // '';
+			if (!defined $transcript_match and $transcript =~ /\Q($words_str)\E/i) {
+				$transcript_match = $check_xkcd;
+			}
+		}
+		
+		$xkcd //= $transcript_match;
+		
+		unless (defined $xkcd) {
+			$irc->yield(privmsg => $channel => "No XKCD match found");
+			return;
+		}
+	} else {
+		my $num = $self->update_xkcd;
+		unless (defined $num) {
+			$irc->yield(privmsg => $channel => "Unable to retrieve latest XKCD comic");
+			return;
+		}
+		$xkcd = $self->cache_xkcd($num);
+	}
+	
+	my $b_code = chr(2);
+	my $num = $xkcd->{'num'};
+	my $title = $xkcd->{'title'};
+	decode_entities($title);
+	my $url = "http://xkcd.com/$num";
+	my $output = "XKCD Comic #$num: $b_code$title$b_code - $url";
+	
+	my $max_transcript = 300;
+	my $transcript = $xkcd->{'transcript'} // '';
+	$transcript =~ s/\r?\n/ \/\/ /g;
+	$transcript = substr($transcript, 0, $max_transcript) . '...' if length $transcript > $max_transcript;
+	$output .= " - $transcript" if length $transcript;
+	
+	$irc->yield(privmsg => $channel => $output);
 }
 
 sub cmd_locate {

@@ -43,6 +43,10 @@ use constant {
 use constant QUEUE_TIMEOUT => 60;
 use constant CACHE_WEATHER_EXPIRATION => 600;
 
+use constant XKCD_CHECK_INTERVAL => 600;
+use constant XKCD_CHECK_EXPIRE => 3600 * 24 * 7;
+use constant XKCD_CHECK_LIMIT => 10;
+
 use constant DEFAULT_CONFIG => {
 	debug => 1,
 	echo  => 1,
@@ -140,6 +144,158 @@ sub init_irc {
 	$self->irc or return undef;
 
 	return $self;
+}
+
+# === Event methods ===
+
+sub _start {
+	my $self = $_[OBJECT];
+	my $heap = $_[HEAP];
+	my $irc = $heap->{irc};
+	my $kernel = $_[KERNEL];
+	
+	my $ircname = $self->config_var('ircname') // DEFAULT_CONFIG->{'ircname'};
+
+	$irc->plugin_add( 'CTCP' => POE::Component::IRC::Plugin::CTCP->new(
+		userinfo => $ircname
+	));
+
+	$irc->yield( register => 'all' );
+	
+	my $server = $self->config_var('server');
+	my $port = $self->config_var('port');
+	$self->print_debug("Starting connection to $server/$port...");
+	$self->start_time(time);
+	$irc->yield( connect => {} );
+	
+	$kernel->sig(TERM => 'sig_terminate');
+	$kernel->sig(QUIT => 'sig_terminate');
+	$kernel->sig(INT => 'sig_terminate');
+	
+	$kernel->yield('check_xkcd');
+	
+	#$self->get_translator_languages;
+	
+	return;
+}
+
+sub _default {
+	my $self = $_[OBJECT];
+	my ($event,$args) = @_[ARG0 .. $#_];
+	my @output = "$event: ";
+	foreach my $arg (@$args) {
+		if (ref $arg eq 'ARRAY') {
+			push @output, '[' . join(', ', @$arg) . ']';
+		} else {
+			push @output, "'$arg'";
+		}
+	}
+	$self->print_debug(join ' ', @output);
+	return 0;
+}
+
+sub sig_terminate {
+	my $self = $_[OBJECT];
+	my $kernel = $_[KERNEL];
+	my $signal = $_[ARG0];
+	
+	$self->print_debug("Received signal SIG$signal");
+	
+	$self->is_stopping(1);
+	$self->end_sessions;
+	$kernel->sig_handled;
+}
+
+sub dns_response {
+	my $self = $_[OBJECT];
+	my $result = $_[ARG0];
+	if (defined $result) {
+		my $irc = $result->{context}{irc};
+		my $question = $result->{context}{question};
+		my $sender = $result->{context}{sender};
+		my $channel = $result->{context}{channel};
+		my $action = $result->{context}{action};
+		my $host = $result->{host};
+		if (defined $result->{response}) {
+			my $address;
+			my $lookuptype = "DNS";
+			foreach my $answer ($result->{response}->answer) {
+				if ($answer->type eq "A" or $answer->type eq "AAAA") {
+					$address = $answer->address;
+					last;
+				} elsif ($answer->type eq "PTR") {
+					$address = $answer->ptrdname;
+					$lookuptype = "RDNS";
+					last;
+				}
+			}
+			$address = $host unless defined $address;
+			if ($action eq 'locate') {
+				my $location = $self->lookup_geoip_location($address);
+				if (defined $location) {
+					$self->print_debug("GeoIP lookup of $address: $location");
+					$irc->yield(privmsg => $channel => "$question appears to be located in: $location");
+				} else {
+					$self->print_debug("GeoIP lookup of $address: unknown");
+					$irc->yield(privmsg => $channel => "Could not find location of $question");
+				}
+			} elsif ($action eq 'weather') {
+				my $location = $self->lookup_geoip_weather($address);
+				if (defined $location) {
+					$self->print_debug("Finding weather for $address at $location");
+					$self->say_userinfo($irc,'weather',$sender,$channel,$location);
+				} else {
+					$self->print_debug("Location of $address unknown");
+					$irc->yield(privmsg => $channel => "Could not find location of $question");
+				}
+			} elsif ($action eq 'forecast') {
+				my $location = $self->lookup_geoip_weather($address);
+				if (defined $location) {
+					my $days = $result->{context}{days};
+					$location .= " $days" if defined $days;
+					$self->print_debug("Finding forecast for $address at $location");
+					$self->say_userinfo($irc,'forecast',$sender,$channel,$location);
+				} else {
+					$self->print_debug("Location of $address unknown");
+					$irc->yield(privmsg => $channel => "Could not find location of $question");
+				}
+			} elsif ($action eq 'wolframalpha') {
+				my $query = $result->{context}{query};
+				$self->print_debug("Sending query to Wolfram Alpha with location IP $address");
+				$self->do_wolframalpha_query($irc,$sender,$channel,$query,$address);
+			} else {
+				$irc->yield(privmsg => $channel => "$lookuptype lookup for $question: " . $address);
+			}
+		}
+		else { $irc->yield(privmsg => $channel => "DNS lookup for $question: Failed"); }
+	}
+}
+
+sub check_xkcd {
+	my $self = $_[OBJECT];
+	my $kernel = $_[KERNEL];
+	
+	$kernel->delay('check_xkcd', XKCD_CHECK_INTERVAL);
+	
+	my $latest_num = $self->update_xkcd // return undef;
+	
+	my $xkcd_queue = $self->{'queue'}{'xkcd'} //= {};
+	delete $xkcd_queue->{$latest_num};
+	foreach my $num (1..$latest_num-1) {
+		my $xkcd = $self->cache_xkcd($num);
+		unless ((defined $xkcd and $xkcd->{'timestamp'}>(time-&XKCD_CHECK_EXPIRE)) or exists $xkcd_queue->{$num}) {
+			$xkcd_queue->{$num} = 1;
+		}
+	}
+	
+	my @to_check = (keys %$xkcd_queue)[0..XKCD_CHECK_LIMIT-1];
+	foreach my $num (@to_check) {
+		next unless defined $num;
+		my $cached = $self->update_xkcd($num);
+		delete $xkcd_queue->{$num};
+	}
+	
+	$self->store_db;
 }
 
 # === Object accessors ===
@@ -1010,129 +1166,6 @@ sub queue_topic_clear {
 	return 1;
 }
 
-# === Event methods ===
-
-sub _start {
-	my $self = $_[OBJECT];
-	my $heap = $_[HEAP];
-	my $irc = $heap->{irc};
-	my $kernel = $_[KERNEL];
-	
-	my $ircname = $self->config_var('ircname') // DEFAULT_CONFIG->{'ircname'};
-
-	$irc->plugin_add( 'CTCP' => POE::Component::IRC::Plugin::CTCP->new(
-		userinfo => $ircname
-	));
-
-	$irc->yield( register => 'all' );
-	
-	my $server = $self->config_var('server');
-	my $port = $self->config_var('port');
-	$self->print_debug("Starting connection to $server/$port...");
-	$self->start_time(time);
-	$irc->yield( connect => {} );
-	
-	$kernel->sig(TERM => 'sig_terminate');
-	$kernel->sig(QUIT => 'sig_terminate');
-	$kernel->sig(INT => 'sig_terminate');
-	
-	#$self->get_translator_languages;
-	
-	return;
-}
-
-sub _default {
-	my $self = $_[OBJECT];
-	my ($event,$args) = @_[ARG0 .. $#_];
-	my @output = "$event: ";
-	foreach my $arg (@$args) {
-		if (ref $arg eq 'ARRAY') {
-			push @output, '[' . join(', ', @$arg) . ']';
-		} else {
-			push @output, "'$arg'";
-		}
-	}
-	$self->print_debug(join ' ', @output);
-	return 0;
-}
-
-sub sig_terminate {
-	my $self = $_[OBJECT];
-	my $kernel = $_[KERNEL];
-	my $signal = $_[ARG0];
-	
-	$self->print_debug("Received signal SIG$signal");
-	
-	$self->is_stopping(1);
-	$self->end_sessions;
-	$kernel->sig_handled;
-}
-
-sub dns_response {
-	my $self = $_[OBJECT];
-	my $result = $_[ARG0];
-	if (defined $result) {
-		my $irc = $result->{context}{irc};
-		my $question = $result->{context}{question};
-		my $sender = $result->{context}{sender};
-		my $channel = $result->{context}{channel};
-		my $action = $result->{context}{action};
-		my $host = $result->{host};
-		if (defined $result->{response}) {
-			my $address;
-			my $lookuptype = "DNS";
-			foreach my $answer ($result->{response}->answer) {
-				if ($answer->type eq "A" or $answer->type eq "AAAA") {
-					$address = $answer->address;
-					last;
-				} elsif ($answer->type eq "PTR") {
-					$address = $answer->ptrdname;
-					$lookuptype = "RDNS";
-					last;
-				}
-			}
-			$address = $host unless defined $address;
-			if ($action eq 'locate') {
-				my $location = $self->lookup_geoip_location($address);
-				if (defined $location) {
-					$self->print_debug("GeoIP lookup of $address: $location");
-					$irc->yield(privmsg => $channel => "$question appears to be located in: $location");
-				} else {
-					$self->print_debug("GeoIP lookup of $address: unknown");
-					$irc->yield(privmsg => $channel => "Could not find location of $question");
-				}
-			} elsif ($action eq 'weather') {
-				my $location = $self->lookup_geoip_weather($address);
-				if (defined $location) {
-					$self->print_debug("Finding weather for $address at $location");
-					$self->say_userinfo($irc,'weather',$sender,$channel,$location);
-				} else {
-					$self->print_debug("Location of $address unknown");
-					$irc->yield(privmsg => $channel => "Could not find location of $question");
-				}
-			} elsif ($action eq 'forecast') {
-				my $location = $self->lookup_geoip_weather($address);
-				if (defined $location) {
-					my $days = $result->{context}{days};
-					$location .= " $days" if defined $days;
-					$self->print_debug("Finding forecast for $address at $location");
-					$self->say_userinfo($irc,'forecast',$sender,$channel,$location);
-				} else {
-					$self->print_debug("Location of $address unknown");
-					$irc->yield(privmsg => $channel => "Could not find location of $question");
-				}
-			} elsif ($action eq 'wolframalpha') {
-				my $query = $result->{context}{query};
-				$self->print_debug("Sending query to Wolfram Alpha with location IP $address");
-				$self->do_wolframalpha_query($irc,$sender,$channel,$query,$address);
-			} else {
-				$irc->yield(privmsg => $channel => "$lookuptype lookup for $question: " . $address);
-			}
-		}
-		else { $irc->yield(privmsg => $channel => "DNS lookup for $question: Failed"); }
-	}
-}
-
 # === Object methods ===
 
 sub get_redirected_url {
@@ -1717,6 +1750,37 @@ sub pyx_random_white {
 	return $white_cards;
 }
 
+sub update_xkcd {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $num = shift;
+	
+	my $url;
+	if (defined $num) {
+		$url = "http://xkcd.com/$num/info.0.json";
+	} else {
+		$url = "http://xkcd.com/info.0.json";
+	}
+	
+	my $lwp = $self->lwp;
+	
+	my $response = $lwp->get($url);
+	if ($response->is_success) {
+		my $xkcd = decode_json($response->decoded_content);
+		$num = $xkcd->{'num'}//0;
+		my $title = $xkcd->{'title'}//'';
+		$self->cache_xkcd($num, $xkcd);
+		$self->print_debug("Cached XKCD $num: $title");
+	} else {
+		$num //= 'default';
+		warn "Failed to retrieve XKCD $num: ".$response->status_line unless $num eq '404';
+		$self->cache_xkcd($num, { 'num' => $num });
+		return undef;
+	}
+	
+	return $num;
+}
+
 # === Internal use methods ===
 
 sub load_config {
@@ -2127,6 +2191,25 @@ sub cache_weather_results {
 	return $self->{'cache'}{'weather'}{$code};
 }
 
+sub cache_xkcd {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $num = shift;
+	
+	my $xkcd_db = $self->db_var('xkcd');
+	$self->db_var('xkcd', $xkcd_db = {'comics' => {}}) unless defined $xkcd_db;
+	return $xkcd_db->{'comics'} unless defined $num;
+	
+	if (@_) {
+		my $data = shift // return undef;
+		$data->{'timestamp'} = time;
+		
+		$xkcd_db->{'comics'}{$num} = $data;
+	}
+	
+	return $xkcd_db->{'comics'}{$num};
+}
+
 sub print_debug {
 	my $self = shift;
 	croak "Not called as an object method" unless defined $self;
@@ -2164,6 +2247,7 @@ sub autojoin {
 
 sub end_sessions {
 	my $self = shift;
+	POE::Kernel->alarm('check_xkcd');
 	if (defined $self->{'irc'}) {
 		$self->irc->yield(join => '0');
 		$self->resolver->shutdown;

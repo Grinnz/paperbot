@@ -18,7 +18,7 @@ while (1) {
 				irc_disconnected irc_ping irc_notice irc_public irc_msg
 				irc_invite irc_kick irc_join irc_part irc_quit irc_nick irc_mode
 				irc_352 irc_315 irc_311 irc_319 irc_313 irc_301 irc_335
-				irc_317 irc_318 irc_320 irc_331 irc_332 irc_333 irc_422 dns_response/
+				irc_317 irc_318 irc_320 irc_331 irc_332 irc_333 irc_422 dns_response check_xkcd/
 			],
 		],
 		heap => { irc => $paper->irc }
