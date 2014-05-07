@@ -2159,9 +2159,8 @@ sub cmd_xkcd {
 				return;
 			}
 		}
-	} elsif (length $args) {
-		my @words = split ' ', $args;
-		my $words_str = join '|', (map { "\Q$_\E" } @words);
+	} elsif ($args =~ /^\s*(.+)\s*$/) {
+		my $search = $1;
 		my $xkcds = $self->cache_xkcd;
 		my $transcript_match;
 		foreach my $num (sort { $b <=> $a } keys %$xkcds) {
@@ -2169,13 +2168,13 @@ sub cmd_xkcd {
 			
 			my $title = $check_xkcd->{'title'} // '';
 			decode_entities($title);
-			if ($title =~ /\b($words_str)\b/i) {
+			if ($title =~ /\b\Q$search\E\b/i) {
 				$xkcd = $check_xkcd;
 				last;
 			}
 			
 			my $transcript = $check_xkcd->{'transcript'} // '';
-			if (!defined $transcript_match and $transcript =~ /\Q($words_str)\E/i) {
+			if (!defined $transcript_match and $transcript =~ /\b\Q$search\E\b/i) {
 				$transcript_match = $check_xkcd;
 			}
 		}
