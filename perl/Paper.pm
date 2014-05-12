@@ -1739,9 +1739,9 @@ sub pyx_random_white {
 	my $sets_str = join ',', map { '$'.$_ } (1..@valid_sets);
 	my $limit_param = @valid_sets+1;
 	
-	my $white_cards = $dbh->selectcol_arrayref('SELECT "text" FROM "white_cards" AS "wc" ' .
+	my $white_cards = $dbh->selectcol_arrayref('SELECT "wc"."text" FROM "white_cards" AS "wc" ' .
 		'INNER JOIN "card_set_white_card" AS "cswc" ON "cswc"."white_card_id"="wc"."id" ' .
-		'WHERE "cswc"."card_set_id" IN ('.$sets_str.') ORDER BY random() LIMIT $'.$limit_param,
+		'WHERE "cswc"."card_set_id" IN ('.$sets_str.') GROUP BY "wc"."id" ORDER BY random() LIMIT $'.$limit_param,
 		undef, @valid_sets, $count);
 	return [] unless defined $white_cards;
 	
