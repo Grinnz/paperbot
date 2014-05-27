@@ -1781,6 +1781,28 @@ sub update_xkcd {
 	return $num;
 }
 
+sub lastfm_recenttracks {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $user = shift;
+	my $num = shift // 1;
+	
+	my $apikey = $self->config_var('lastfm_key');
+	
+	$user = uri_escape($user);
+	
+	my $request = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=$user&api_key=$apikey&format=json&limit=$num";
+	my $response = get($request);
+	return undef unless defined $response;
+	
+	my $response_decoded = eval { decode_json $response };
+	warn $@ and return undef if $@;
+	return undef unless defined $response_decoded;
+	
+	warn "LastFM error: ".$response_decoded->{'message'} and return undef if $response_decoded->{'error'};
+	return $response_decoded->{'recenttracks'} // {};
+}
+
 # === Internal use methods ===
 
 sub load_config {

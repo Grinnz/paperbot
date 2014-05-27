@@ -117,7 +117,9 @@ my %command = (
 	'speak' => { func => 'cmd_speak', access => ACCESS_VOICE, on => 1, strip => 1 },
 	'twitter' => { func => 'cmd_twitter', access => ACCESS_NONE, on => 1, strip => 1 },
 	'wolframalpha' => { func => 'cmd_wolframalpha', access => ACCESS_NONE, on => 1, strip => 1 },
-	'pyx' => { func => 'cmd_pyx', access => ACCESS_NONE, on => 1, strip => 1 }
+	'pyx' => { func => 'cmd_pyx', access => ACCESS_NONE, on => 1, strip => 1 },
+	'np' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 },
+	'nowplaying' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 }
 );
 
 sub cmds_structure {
@@ -3178,6 +3180,74 @@ sub cmd_pyx {
 	$self->print_debug("Filled in: $output");
 	
 	$irc->yield(privmsg => $channel => "PYX Match: $output");
+}
+
+sub cmd_nowplaying {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$channel = $sender unless $channel;
+	
+	my $username = $sender;
+	my $ident = $self->state_user($sender, 'ident');
+	$username = $ident if defined $ident;
+	
+	if ($args =~ /^\s*set\s*(\S+)/) {
+		my $lastfm_username = $1;
+		
+		my $lastfm_users = $self->db_var('lastfm_users');
+		unless (defined $lastfm_users) {
+			$lastfm_users = {};
+			$self->db_var('lastfm_users', $lastfm_users);
+		}
+		
+		$lastfm_users->{$username} = $lastfm_username;
+		$self->store_db;
+		
+		$irc->yield(privmsg => $channel => "Set Last.FM user for $username to $lastfm_username");
+		return;
+	} elsif ($args =~ /^\s*(\S+)/) {
+		$username = $1;
+	} else {
+		my $lastfm_users = $self->db_var('lastfm_users') // {};
+		my $lastfm_username = $lastfm_users->{$username};
+		$username = $lastfm_username if defined $lastfm_username;
+	}
+	
+	my $recent = $self->lastfm_recenttracks($username);
+	unless (defined $recent) {
+		$irc->yield(privmsg => $channel => "Error retrieving Last.FM info for $username");
+		return;
+	}
+	unless (length $recent) {
+		$irc->yield(privmsg => $channel => "No recent tracks found for $username");
+		return;
+	}
+	
+	my $lastfm_user = $recent->{'@attr'}{'user'} // '';
+	my $tracks = $recent->{'track'};
+	$tracks = [$tracks] unless ref $tracks eq 'ARRAY';
+	my $last_track = $tracks->[0];
+	
+	my $track_name = $last_track->{'name'} // '';
+	my $artist = $last_track->{'artist'}{'#text'};
+	my $album = $last_track->{'album'}{'#text'};
+	my $nowplaying = $last_track->{'@attr'}{'nowplaying'};
+	my $played_at = $last_track->{'date'}{'uts'};
+	
+	my $track_info = $track_name;
+	$track_info = "$artist - $track_info" if defined $artist;
+	$track_info = "$track_info (from $album)" if defined $album;
+	
+	my $output;
+	if ($nowplaying) {
+		$output = "Now playing for $lastfm_user: $track_info";
+	} else {
+		my $time_offset = ago(time-$played_at);
+		$output = "Last track played for $lastfm_user: $track_info $time_offset";
+	}
+	
+	$self->print_debug("Last.FM recent track for $lastfm_user: $track_info");
+	$irc->yield(privmsg => $channel => $output);
 }
 
 1;
