@@ -3235,8 +3235,8 @@ sub cmd_nowplaying {
 	my $played_at = $last_track->{'date'}{'uts'};
 	
 	my $track_info = $track_name;
-	$track_info = "$artist - $track_info" if defined $artist;
-	$track_info = "$track_info (from $album)" if defined $album;
+	$track_info = "$artist - $track_info" if defined $artist and length $artist;
+	$track_info = "$track_info (from $album)" if defined $album and length $album;
 	
 	my $output;
 	if ($nowplaying) {
