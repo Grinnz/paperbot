@@ -18,8 +18,7 @@ use constant ACCESS_LEVELS();
 
 our @EXPORT = (keys %{ACCESS_LEVELS()}, 'valid_access_level');
 
-my %level_nums;
-$level_nums{$_} = 1 foreach values %{ACCESS_LEVELS()};
+my %level_nums = map { $_ => 1 } values %{ACCESS_LEVELS()};
 
 sub valid_access_level {
 	my $level = shift // return undef;
