@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Carp;
 use POE;
+use Paper::Commands::Access;
 use HTML::Entities;
 use Date::Parse;
 use Time::Duration;

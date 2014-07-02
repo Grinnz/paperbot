@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Carp;
 use POE;
+use Paper::Commands::Access;
 use Exporter qw/import/;
 use HTML::Entities;
 use Date::Parse;
@@ -18,19 +19,8 @@ use LWP::Simple;
 use constant MAX_FORECAST_DAYS => 4;
 use constant PYX_MAX_PICK => 3;
 
-use constant {
-	ACCESS_NONE => 0,
-	ACCESS_VOICE => 1,
-	ACCESS_HALFOP => 2,
-	ACCESS_OP => 3,
-	ACCESS_CHANADMIN => 4,
-	ACCESS_BOTADMIN => 5,
-	ACCESS_MASTER => 6
-};
-
 our @EXPORT = qw/cmds_substr_index command_exists command_strip parse_cmd check_access
-	cmd_queue_info say_userinfo do_conversion do_wolframalpha_query cmd_deluser
-	ACCESS_NONE ACCESS_VOICE ACCESS_HALFOP ACCESS_OP ACCESS_CHANADMIN ACCESS_BOTADMIN ACCESS_MASTER/;
+	cmd_queue_info say_userinfo do_conversion do_wolframalpha_query cmd_deluser/;
 
 my %userinfo = (
 	'user' => \&say_whois,

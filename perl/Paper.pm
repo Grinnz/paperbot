@@ -82,6 +82,14 @@ BEGIN {
 
 our @EXPORT = qw/IRC_SOCIALGAMER IRC_GAMESURGE IRC_FREENODE/;
 
+my $paper;
+
+sub singleton {
+	return $paper if $paper;
+	my $class = shift;
+	return $class->new(@_);
+}
+
 sub new {
 	my $class = shift;
 	my ($confdir, $irctype) = @_;
@@ -118,6 +126,8 @@ sub new {
 	$self->{'child_pids'} = {};
 	$self->{'version'} = $version;
 	bless $self, $class;
+	
+	$paper = $self;
 	
 	return $self;
 }
