@@ -3264,6 +3264,8 @@ sub cmd_mrr {
 			my $data = $details->{'data'};
 			
 			my $id = $data->{'id'} // $rigid;
+			my $name = $data->{'name'} // '';
+			my $owner = $data->{'owner'} // '';
 			my $type = $data->{'type'} // '';
 			my $status = $data->{'status'} // '';
 			my $price = $data->{'price'} // '';
@@ -3283,7 +3285,15 @@ sub cmd_mrr {
 			my $url = "http://rentrig.co/rigs/$id";
 			
 			my $b_code = chr(2);
-			my $output = "Rig $id [$type]: $b_code$status$b_code | Advertised: $b_code$hr_adv_disp$b_code, 5m/30m/1h Average: ${hr_5m_disp} / ${hr_30m_disp} / ${hr_60m_disp} | Price: $b_code$price$b_code BTC/MH/Day ($perday BTC/Day) | $url";
+			my @sections = (
+				"Rig $id [$type]: $b_code$name$b_code",
+				"Owner: $b_code$owner$b_code",
+				"Status: $b_code$status$b_code",
+				"Advertised: $b_code$hr_adv_disp$b_code, 5m/30m/1h Average: ${hr_5m_disp} / ${hr_30m_disp} / ${hr_60m_disp}",
+				"Price: $b_code$price$b_code BTC/MH/Day ($perday BTC/Day)",
+				"$url"
+			);
+			my $output = join ' | ', @sections;
 			$irc->yield(privmsg => $channel => $output);
 		} else {
 			my $message = $details->{'message'};
