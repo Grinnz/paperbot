@@ -1813,6 +1813,27 @@ sub lastfm_recenttracks {
 	return $response_decoded->{'recenttracks'} // {};
 }
 
+sub mrr_rigdetails {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my $rigid = shift;
+	
+	my $lwp = $self->lwp;
+	
+	my $request = "https://www.miningrigrentals.com/api/v1/rigs";
+	my %post = ( 'method' => 'detail', 'id' => $rigid );
+	
+	my $response = $lwp->post($request, \%post);
+	if ($response->is_success) {
+		my $response_decoded = eval { decode_json($response->decoded_content); };
+		warn $@ and return undef if $@;
+		return $response_decoded;
+	} else {
+		$self->print_debug("Error requesting rig status: ".$response->status_line);
+		return undef;
+	}
+}
+
 # === Internal use methods ===
 
 sub load_config {

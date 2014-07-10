@@ -109,7 +109,8 @@ my %command = (
 	'wolframalpha' => { func => 'cmd_wolframalpha', access => ACCESS_NONE, on => 1, strip => 1 },
 	'pyx' => { func => 'cmd_pyx', access => ACCESS_NONE, on => 1, strip => 1 },
 	'np' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 },
-	'nowplaying' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 }
+	'nowplaying' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 },
+	'mrr' => { func => 'cmd_mrr', access => ACCESS_NONE, on => 1, strip => 1 },
 );
 
 sub cmds_structure {
@@ -3238,6 +3239,80 @@ sub cmd_nowplaying {
 	
 	$self->print_debug("Last.FM recent track for $lastfm_user: $track_info");
 	$irc->yield(privmsg => $channel => $output);
+}
+
+sub cmd_mrr {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$channel = $sender unless $channel;
+	
+	my $rigid;
+	if ($args =~ /^\s*rig\s*(\d+)/i) {
+		$rigid = $1;
+	} else {
+		$rigid = $args;
+	}
+	
+	if (defined $rigid) {
+		my $details = $self->mrr_rigdetails($rigid);
+		unless (defined $details) {
+			$irc->yield(privmsg => $channel => "Error retrieving rig status for rig ID $rigid");
+			return;
+		}
+		
+		if ($details->{'success'}) {
+			my $data = $details->{'data'};
+			
+			my $id = $data->{'id'} // $rigid;
+			my $type = $data->{'type'} // '';
+			my $status = $data->{'status'} // '';
+			my $price = $data->{'price'} // '';
+			my $hashrate = $data->{'hashrate'} // {};
+			
+			my $hr_adv = $hashrate->{'advertised'} // 0;
+			my $hr_5m = $hashrate->{'5min'} // 0;
+			my $hr_30m = $hashrate->{'30min'} // 0;
+			my $hr_60m = $hashrate->{'60min'} // 0;
+			
+			my $perday = $price * $hr_adv / 1000000;
+			my $hr_adv_disp = mrr_hashrate_display($hr_adv);
+			my $hr_5m_disp = mrr_hashrate_display($hr_5m);
+			my $hr_30m_disp = mrr_hashrate_display($hr_30m);
+			my $hr_60m_disp = mrr_hashrate_display($hr_60m);
+			
+			my $url = "http://rentrig.co/rigs/$id";
+			
+			my $b_code = chr(2);
+			my $output = "Rig $id [$type]: $b_code$status$b_code | Advertised: $b_code$hr_adv_disp$b_code, 5m/30m/1h Average: ${hr_5m_disp} / ${hr_30m_disp} / ${hr_60m_disp} | Price: $b_code$price$b_code BTC/MH/Day ($perday BTC/Day) | $url";
+			$irc->yield(privmsg => $channel => $output);
+		} else {
+			my $message = $details->{'message'};
+			$irc->yield(privmsg => $channel => "Error retrieving rig status: $message");
+		}
+	}
+}
+
+sub mrr_hashrate_display {
+	my $hr = shift;
+	return undef unless defined $hr and looks_like_number($hr);
+	
+	my $factor = 1;
+	my $prefix = '';
+	if ($hr > 1000000000000) {
+		$factor = 1000000000000;
+		$prefix = 'T';
+	} elsif ($hr > 1000000000) {
+		$factor = 1000000000;
+		$prefix = 'G';
+	} elsif ($hr > 1000000) {
+		$factor = 1000000;
+		$prefix = 'M';
+	} elsif ($hr > 1000) {
+		$factor = 1000;
+		$prefix = 'K';
+	}
+	
+	return sprintf "%.2f %sH", $hr / $factor, $prefix;
 }
 
 1;
