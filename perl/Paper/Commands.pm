@@ -3246,14 +3246,20 @@ sub cmd_mrr {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
-	my $rigid;
+	my $method;
+	my $rigid = 0;
+	my $list_type = 'scrypt';
 	if ($args =~ /^\s*rig\s*(\d+)/i) {
+		$method = 'rig';
 		$rigid = $1;
+	} elsif ($args =~ /^\s*list\s*(\w+)/i) {
+		$method = 'list';
+		$list_type = $1;
 	} else {
-		$rigid = $args;
+		$method = 'list';
 	}
 	
-	if (defined $rigid) {
+	if ($method eq 'rig') {
 		my $details = $self->mrr_rigdetails($rigid);
 		unless (defined $details) {
 			$irc->yield(privmsg => $channel => "Error retrieving rig status for rig ID $rigid");
@@ -3298,6 +3304,48 @@ sub cmd_mrr {
 		} else {
 			my $message = $details->{'message'};
 			$irc->yield(privmsg => $channel => "Error retrieving rig status: $message");
+		}
+	} elsif ($method eq 'list') {
+		my $list = $self->mrr_riglist($list_type);
+		unless (defined $list) {
+			$irc->yield(privmsg => $channel => "Error retrieving rig list for algorithm $list_type");
+			return;
+		}
+		
+		if ($list->{'success'}) {
+			my $data = $list->{'data'};
+			my $counts = $data->{'info'};
+			my $rigs = $data->{'records'};
+			
+			my $total = $counts->{'total'};
+			
+			my $url = "http://rentrig.co/rigs/$list_type";
+			
+			my $b_code = chr(2);
+			my $output = "$b_code$total$b_code $list_type rigs listed for rent: $url";
+			
+			splice @$rigs, 5 if @$rigs > 5;
+			my @rig_details;
+			foreach my $rig (@$rigs) {
+				my $id = $rig->{'id'};
+				my $name = $rig->{'name'};
+				my $status = $rig->{'status'};
+				my $price = $rig->{'price_mhash'};
+				my $hashrate = $rig->{'hashrate_nice'};
+				
+				my $b_code = chr(2);
+				my $rig_output = "Rig $id [$b_code$price$b_code BTC/MH/Day - $hashrate]: $name";
+				push @rig_details, $rig_output;
+			}
+			
+			if (@rig_details) {
+				$output = "$output | " . join ' | ', @rig_details;
+			}
+			
+			$irc->yield(privmsg => $channel => $output);
+		} else {
+			my $message = $list->{'message'};
+			$irc->yield(privmsg => $channel => "Error retrieving rig list: $message");
 		}
 	}
 }
