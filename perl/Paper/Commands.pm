@@ -1335,9 +1335,10 @@ sub cmd_google {
 			my $r = $self->cache_search_next('google');
 			$self->print_debug("[0] ".$r->title." (".$r->url.")");
 			my $title = Paper::strip_google($r->title);
+			my $content = Paper::strip_google($r->content);
 			my $url = $r->url;
 			$url =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-			$irc->yield(privmsg => $channel => "Top result for \"$args\": $title : $url");
+			$irc->yield(privmsg => $channel => "Top result for \"$args\": $title | $url | $content");
 		}
 		else {
 			$irc->yield(privmsg => $channel => "No results for \"$args\"");
@@ -1347,10 +1348,12 @@ sub cmd_google {
 		my $r = $self->cache_search_next('google');
 		if (defined $r) {
 			my $title = Paper::strip_google($r->title);
+			my $content = Paper::strip_google($r->content);
 			my $url = $r->url;
+			$url =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
 			my $index = $self->cache_search_index('google');
 			$self->print_debug("[$index] $title ($url)");
-			$irc->yield(privmsg => $channel => "Next result: $title : $url");
+			$irc->yield(privmsg => $channel => "Next result: $title | $url | $content");
 		}
 		else {
 			$irc->yield(privmsg => $channel => "No more results");
