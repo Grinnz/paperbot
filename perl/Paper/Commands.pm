@@ -9,12 +9,14 @@ use Exporter qw/import/;
 use HTML::Entities;
 use Date::Parse;
 use Time::Duration;
+use Time::HiRes qw/time/;
 use Scalar::Util qw/looks_like_number/;
 use Math::Complex;
 use Math::Trig;
 use Data::Validate::IP qw/is_ipv4 is_ipv6/;
 use Encode qw/decode/;
 use LWP::Simple;
+use Net::Ping;
 
 use constant MAX_FORECAST_DAYS => 4;
 use constant PYX_MAX_PICK => 3;
@@ -858,12 +860,37 @@ sub cmd_me {
 sub cmd_ping {
 	my $self = shift;
 	my ($irc,$sender,$channel,$args) = @_;
-	if ($channel) { $self->print_debug("Pinged by $sender in $channel."); }
-	else {
-		$self->print_debug("Pinged by $sender privately.");
-		$channel = $sender;
+	$channel = $sender unless $channel;
+	if ($args =~ /(\S+)/) {
+		my $host = $1;
+		my ($success, $protocol, $ping_time);
+		
+		my $start_time = time;
+		my $response = system("ping -c 1 -W 2 $host");
+		$ping_time = time-$start_time;
+		if ($response == 0) {
+			$protocol = 'ICMP';
+			$success = 1;
+		} else {
+			$start_time = time;
+			my $ping = Net::Ping->new;
+			$ping->port_number(80);
+			$response = $ping->ping($host, 2);
+			$ping_time = time-$start_time;
+			if ($response) {
+				$protocol = 'TCP';
+				$success = 1;
+			}
+		}
+		
+		if ($success) { 
+			$irc->yield(privmsg => $channel => sprintf('Ping %s: %s response in %.3f seconds', $host, $protocol, $ping_time));
+		} else {
+			$irc->yield(privmsg => $channel => "Ping $host: No response");
+		}
+	} else {
+		$irc->yield(privmsg => $channel => "Pong.");
 	}
-	$irc->yield(privmsg => $channel => "Pong.");
 }
 
 sub cmd_ding {
@@ -3333,7 +3360,7 @@ sub cmd_mrr {
 				my $id = $rig->{'id'};
 				my $name = $rig->{'name'};
 				my $status = $rig->{'status'};
-				my $price = $rig->{'price_mhash'};
+				my $price = $rig->{'price'};
 				my $hashrate = $rig->{'hashrate_nice'};
 				
 				my $b_code = chr(2);
