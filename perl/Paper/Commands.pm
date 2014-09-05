@@ -22,7 +22,7 @@ use constant MAX_FORECAST_DAYS => 4;
 use constant PYX_MAX_PICK => 3;
 
 our @EXPORT = qw/cmds_substr_index command_exists command_strip parse_cmd check_access
-	cmd_queue_info say_userinfo do_conversion do_wolframalpha_query cmd_deluser/;
+	cmd_queue_info say_userinfo do_conversion do_wolframalpha_query cmd_deluser cmd_fuckoff/;
 
 my %userinfo = (
 	'user' => \&say_whois,
