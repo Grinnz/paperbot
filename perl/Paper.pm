@@ -13,6 +13,7 @@ use POE qw/Component::IRC Component::IRC::Plugin::CTCP Component::Client::DNS/;
 
 use Text::Aspell;
 use REST::Google::Search::Web;
+use REST::Google::Search::Images;
 use Sys::Statistics::Linux::SysInfo;
 use GeoIP2::Database::Reader;
 use Geo::METAR;
@@ -78,6 +79,7 @@ use constant DEFAULT_DB => {
 
 BEGIN {
 	REST::Google::Search::Web->http_referer('http://grinnz.com');
+	REST::Google::Search::Images->http_referer('http://grinnz.com');
 }
 
 our @EXPORT = qw/IRC_SOCIALGAMER IRC_GAMESURGE IRC_FREENODE/;
@@ -1202,12 +1204,8 @@ sub search_google_web {
 	croak "Not called as an object method" unless defined $self;
 	my ($q, $results, $safesearch) = @_;
 	croak "Invalid search query" unless defined $q;
-	$results = 'large' unless defined $results;
-	if (defined $safesearch) {
-		$safesearch = $safesearch ? 'active' : 'off';
-	} else {
-		$safesearch = 'off';
-	}
+	$results //= 'large';
+	$safesearch = $safesearch ? 'active' : 'off';
 	
 	my $key = $self->config_var('googlekey');
 	
@@ -1249,6 +1247,31 @@ sub search_google_web_count {
 	}
 	
 	return $res->responseData->cursor->estimatedResultCount;
+}
+
+sub search_google_images {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	my ($q, $results, $safesearch) = shift;
+	croak "Invalid search query" unless defined $q;
+	$results //= 'large';
+	$safesearch = $safesearch ? 'active' : 'off';
+	
+	my $key = $self->config_var('googlekey');
+	
+	my $res = eval {
+		REST::Google::Search::Images->new(q => $q, key => $key, rsz => $results, safe => $safesearch);
+	};
+	if ($@) {
+		$self->print_debug("Error calling Google search: $@");
+		return undef;
+	}
+	if ($res->responseStatus != 200) {
+		$self->print_debug("Error calling Google search: ".$res->responseDetails);
+		return undef;
+	}
+	my @results = $res->responseData->results;
+	return \@results;
 }
 
 sub search_youtube {

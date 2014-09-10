@@ -75,6 +75,7 @@ my %command = (
 	'stay' => { func => 'cmd_stay', access => ACCESS_CHANADMIN, on => 1, strip => 0 },
 	'listchans' => { func => 'cmd_listchans', access => ACCESS_BOTADMIN, on => 1, strip => 0 },
 	'google' => { func => 'cmd_google', access => ACCESS_NONE, on => 1, strip => 1 },
+	'images' => { func => 'cmd_images', access => ACCESS_NONE, on => 1, strip => 1 },
 	'spell' => { func => 'cmd_spell', access => ACCESS_NONE, on => 1, strip => 1 },
 	'define' => { func => 'cmd_define', access => ACCESS_VOICE, on => 0, strip => 1 },
 	'spellmode' => { func => 'cmd_spellmode', access => ACCESS_MASTER, on => 1, strip => 1 },
@@ -1349,7 +1350,7 @@ sub cmd_google {
 		my $safe = 'active';
 		$safe = 'off' if $sender eq '-fight';
 		
-		my $results = $self->search_google_web($args);
+		my $results = $self->search_google_web($args, undef, $safe);
 		unless (defined $results) {
 			$self->cache_search_clear('google');
 			$irc->yield(privmsg => $channel => "An error occurred attempting to search Google.");
@@ -1385,6 +1386,54 @@ sub cmd_google {
 		else {
 			$irc->yield(privmsg => $channel => "No more results");
 			$self->cache_search_clear('google');
+		}
+	}
+}
+
+sub cmd_images {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	if (!$channel) { $channel = $sender; }
+	if (length $args) {
+		my $safe = 'active';
+		my $results = $self->search_google_images($args, undef, $safe);
+		unless (defined $results) {
+			$self->cache_search_clear('images');
+			$irc->yield(privmsg => $channel => "An error occurred attempting to search Google Images.");
+			return;
+		}
+		
+		$self->cache_search_results('images', $results);
+		
+		if (@$results) {
+			my $r = $self->cache_search_next('images');
+			$self->print_debug("[0] ".$r->title." (".$r->url.")");
+			my $title = Paper::strip_google($r->title);
+			my $url = $r->url;
+			$url =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+			my $context_url = $r->originalContextUrl;
+			$context_url =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+			$irc->yield(privmsg => $channel => "Top result for \"$args\": $url | $title | $context_url");
+		}
+		else {
+			$irc->yield(privmsg => $channel => "No results for \"$args\"");
+		}
+	}
+	else {
+		my $r = $self->cache_search_next('images');
+		if (defined $r) {
+			my $title = Paper::strip_google($r->title);
+			my $url = $r->url;
+			$url =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+			my $context_url = $r->originalContextUrl;
+			$context_url =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+			my $index = $self->cache_search_index('images');
+			$self->print_debug("[$index] $title ($url)");
+			$irc->yield(privmsg => $channel => "Next result: $url | $title | $context_url");
+		}
+		else {
+			$irc->yield(privmsg => $channel => "No more results");
+			$self->cache_search_clear('images');
 		}
 	}
 }
