@@ -3223,6 +3223,15 @@ sub cmd_pyx {
 	}
 	
 	if (defined $white_cards and @$white_cards) {
+		my $count_wildcards = grep { $_ eq '?' } @$white_cards;
+		if ($count_wildcards) {
+			$self->print_debug("Getting $count_wildcards extra white cards");
+			my $extra_white_cards = $self->pyx_random_white($count_wildcards);
+			foreach my $white_card (@$white_cards) {
+				$white_card = shift @$extra_white_cards if $white_card eq '?';
+			}
+		}
+		
 		my $white_card_text = join ', ', @$white_cards;
 		$self->print_debug("Getting black card for white cards: $white_card_text");
 		
