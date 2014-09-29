@@ -114,6 +114,7 @@ my %command = (
 	'np' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 },
 	'nowplaying' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 },
 	'mrr' => { func => 'cmd_mrr', access => ACCESS_NONE, on => 1, strip => 1 },
+	'pick' => { func => 'cmd_pick', access => ACCESS_NONE, on => 1, strip => 1 },
 );
 
 sub cmds_structure {
@@ -3460,6 +3461,21 @@ sub mrr_hashrate_display {
 	}
 	
 	return sprintf "%.2f %sH", $hr / $factor, $prefix;
+}
+
+sub cmd_pick {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$channel = $sender unless $channel;
+	
+	my @choices = split /\s*,\s*/, $args;
+	if (@choices > 1) {
+		my $i = int rand @choices;
+		my $choice = $choices[$i] // '';
+		$irc->yield(privmsg => $channel => sprintf('%u: %s', $i+1, $choice));
+	} else {
+		$irc->yield(privmsg => $channel => "Usage: ~pick choice1, choice2, ...");
+	}
 }
 
 1;
