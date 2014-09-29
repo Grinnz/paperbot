@@ -1679,7 +1679,8 @@ my %functions = (
 	'atan' => { 'args' => 1, 'sub' => sub { atan($_[0]) } },
 	'int' => { 'args' => 1, 'sub' => sub { int($_[0]) } },
 	'floor' => { 'args' => 1, 'sub' => sub { POSIX::floor($_[0]) } },
-	'ceil' => { 'args' => 1, 'sub' => sub { POSIX::ceil($_[0]) } }
+	'ceil' => { 'args' => 1, 'sub' => sub { POSIX::ceil($_[0]) } },
+	'rand' => { 'args' => 0, 'sub' => sub { rand } },
 );
 
 my $operators_re = '(?:-|\\+|\\*|\\/|\\^|%|<<|>>)';
