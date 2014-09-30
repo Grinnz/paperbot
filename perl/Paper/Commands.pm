@@ -3468,10 +3468,11 @@ sub cmd_pick {
 	my ($irc,$sender,$channel,$args) = @_;
 	$channel = $sender unless $channel;
 	
-	my @choices = split /\s*,\s*/, $args;
+	my @choices = split /\s*(?<!\\),\s*/, $args;
 	if (@choices > 1) {
 		my $i = int rand @choices;
 		my $choice = $choices[$i] // '';
+		$choice =~ s/\\,/,/g;
 		$irc->yield(privmsg => $channel => sprintf('%u: %s', $i+1, $choice));
 	} else {
 		$irc->yield(privmsg => $channel => "Usage: ~pick choice1, choice2, ...");
