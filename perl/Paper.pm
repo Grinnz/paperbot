@@ -1643,7 +1643,7 @@ sub lookup_geoip_record {
 	
 	if (is_ipv4($ip) or is_ipv6($ip)) {
 		my $geoip = $self->geoip;
-		my $record = eval { $geoip->city_isp_org(ip => $ip); };
+		my $record = eval { $geoip->city(ip => $ip); };
 		warn $@ and return undef if $@;
 		return $record;
 	} else {
