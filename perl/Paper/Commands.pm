@@ -2829,7 +2829,7 @@ sub cmd_translate {
 	my $translated_phrase = $self->translate($phrase, $from_code, $to_code);
 	if (defined $translated_phrase) {
 		$self->print_debug("Translation: $translated_phrase");
-		$irc->yield(privmsg => $channel => "Translated from $from_name to $to_name: $translated_phrase");
+		$irc->yield(privmsg => $channel => "Translated $from_name => $to_name: $translated_phrase");
 	} else {
 		$irc->yield(privmsg => $channel => "Error translating phrase");
 	}
