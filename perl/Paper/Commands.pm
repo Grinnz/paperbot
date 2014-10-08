@@ -103,7 +103,7 @@ my %command = (
 	'weather' => { func => 'cmd_weather', access => ACCESS_NONE, on => 1, strip => 1 },
 	'forecast' => { func => 'cmd_forecast', access => ACCESS_NONE, on => 1, strip => 1 },
 	'convert' => { func => 'cmd_convert', access => ACCESS_NONE, on => 1, strip => 1 },
-	'locate' => { func => 'cmd_locate', access => ACCESS_VOICE, on => 1, strip => 1 },
+	'locate' => { func => 'cmd_locate', access => ACCESS_NONE, on => 1, strip => 1 },
 	'wiki' => { func => 'cmd_wiki', access => ACCESS_NONE, on => 1, strip => 1 },
 	'translate' => { func => 'cmd_translate', access => ACCESS_NONE, on => 1, strip => 1 },
 	'translationparty' => { func => 'cmd_translationparty', access => ACCESS_NONE, on => 1, strip => 1 },
