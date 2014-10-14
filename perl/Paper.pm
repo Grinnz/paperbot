@@ -197,8 +197,9 @@ sub _default {
 	my @output = "$event: ";
 	foreach my $arg (@$args) {
 		if (ref $arg eq 'ARRAY') {
-			push @output, '[' . join(', ', @$arg) . ']';
+			push @output, '[' . join(', ', (map { $_ // '(NULL)' } @$arg)) . ']';
 		} else {
+			$arg //= '(NULL)';
 			push @output, "'$arg'";
 		}
 	}
