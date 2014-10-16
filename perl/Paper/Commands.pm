@@ -3183,6 +3183,10 @@ sub do_wolframalpha_query {
 				my $output = join ' || ', @pod_contents;
 				
 				$self->print_debug("Response: $output");
+				if (length $output > 300) {
+					$output = substr $output, 0, 300;
+					$output .= '...';
+				}
 				$irc->yield(privmsg => $channel => $output);
 			} else {
 				$self->print_debug("No response");
