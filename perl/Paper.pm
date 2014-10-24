@@ -29,6 +29,7 @@ use Digest::MD5 qw/md5_hex/;
 use Data::Validate::IP qw/is_ipv4 is_ipv6/;
 use MIME::Base64;
 use DBI;
+use MetaCPAN::Client;
 
 use Paper::IRC;
 use Paper::Commands;
@@ -546,6 +547,17 @@ sub metar {
 	}
 	
 	return $self->{'metar'};
+}
+
+sub mcpan {
+	my $self = shift;
+	croak "Not called as an object method" unless defined $self;
+	
+	unless (defined $self->{'mcpan'}) {
+		$self->{'mcpan'} = MetaCPAN::Client->new;
+	}
+	
+	return $self->{'mcpan'};
 }
 
 sub ms_access_token {

@@ -115,6 +115,7 @@ my %command = (
 	'nowplaying' => { func => 'cmd_nowplaying', access => ACCESS_NONE, on => 1, strip => 1 },
 	'mrr' => { func => 'cmd_mrr', access => ACCESS_NONE, on => 1, strip => 1 },
 	'pick' => { func => 'cmd_pick', access => ACCESS_NONE, on => 1, strip => 1 },
+	'cpan' => { func => 'cmd_cpan', access => ACCESS_NONE, on => 1, strip => 1 },
 );
 
 sub cmds_structure {
@@ -3480,6 +3481,112 @@ sub cmd_pick {
 		$irc->yield(privmsg => $channel => sprintf('%u: %s', $i+1, $choice));
 	} else {
 		$irc->yield(privmsg => $channel => "Usage: ~pick choice1, choice2, ...");
+	}
+}
+
+sub cmd_cpan {
+	my $self = shift;
+	my ($irc,$sender,$channel,$args) = @_;
+	$channel = $sender unless $channel;
+	
+	my ($author, $module, $distribution, $release);
+	if ($args =~ /^\s*author\s+(.+)/i) {
+		$author = $1;
+	} elsif ($args =~ /^\s*dist(?:ribution)?\s+(.+)/i) {
+		$distribution = $1;
+	} elsif ($args =~ /^\s*module\s+(.+)/i) {
+		$module = $1;
+	} elsif ($args =~ /\S/) {
+		$module = $args;
+	}
+	
+	my $mcpan = $self->mcpan;
+	
+	if (defined $module) {
+		my $result = eval { $mcpan->module($module); };
+		unless (defined $result) {
+			my $search = $module;
+			my $results = $mcpan->module({ either => [
+				{ name => $search },
+				{ distribution => $search },
+			]});
+			
+			if ($results->total) {
+				$result = $results->next;
+			}
+		}
+		
+		if (defined $result) {
+			my $name = $result->documentation // $result->name;
+			my $short_desc = $result->abstract//'';
+			if (length $short_desc > 200) {
+				$short_desc = substr($short_desc, 0, 200) . '...';
+			}
+			my $output = sprintf 'CPAN module %s %s [%s] by %s : %s', $name, $result->version, $result->distribution, $result->author, $short_desc;
+			$irc->yield(privmsg => $channel => $output);
+		} else {
+			$irc->yield(privmsg => $channel => "No results for CPAN module search");
+		}
+	} elsif (defined $author) {
+		my $result = eval { $mcpan->author($author); };
+		unless (defined $result) {
+			my $search = $author;
+			my $results = $mcpan->author({ either => [
+				{ name => $search },
+				{ asciiname => $search },
+				{ pauseid => $search },
+				{ email => $search },
+			]});
+			
+			if ($results->total) {
+				$result = $results->next;
+			}
+		}
+		
+		if (defined $result) {
+			my $email = $result->email;
+			$email = shift @$email if defined $email and ref $email eq 'ARRAY';
+			my $output = sprintf 'CPAN author %s [%s] - %s', $result->name, $result->pauseid, $email;
+			$irc->yield(privmsg => $channel => $output);
+		} else {
+			$irc->yield(privmsg => $channel => "No results for CPAN author search");
+		}
+	} elsif (defined $distribution) {
+		my $result = eval { $mcpan->distribution($distribution); };
+		unless (defined $result) {
+			my $search = $distribution;
+			my $results = $mcpan->distribution({ name => $search });
+			
+			my $total = $results->total;
+			if ($total) {
+				if ($total == 1) {
+					$result = $results->next;
+				} else {
+					my @results;
+					for my $i (0..4) {
+						my $next_result = $results->next;
+						last unless defined $next_result;
+						push @results, $next_result->name;
+					}
+					push @results, "... ($total found)" if $total > 5;
+					$result = \@results;
+				}
+			}
+		}
+		
+		if (defined $result) {
+			my $output;
+			if (ref $result eq 'ARRAY') {
+				$output = sprintf 'CPAN distributions found: %s', (join ', ', @$result);
+			} else {
+				$output = sprintf 'CPAN distribution found: %s', $result->name;
+			}
+			$irc->yield(privmsg => $channel => $output);
+		} else {
+			$irc->yield(privmsg => $channel => "No results for CPAN distribution search");
+		}
+	} else {
+		$irc->yield(privmsg => $channel => "Usage: ~cpan (author|distribution|module)? query");
 	}
 }
 
