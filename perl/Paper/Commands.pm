@@ -3509,6 +3509,7 @@ sub cmd_cpan {
 			my $results = $mcpan->module({ either => [
 				{ name => $search },
 				{ distribution => $search },
+				{ documentation => $search },
 			]});
 			
 			if ($results->total) {
@@ -3517,12 +3518,19 @@ sub cmd_cpan {
 		}
 		
 		if (defined $result) {
-			my $name = $result->documentation // $result->name;
-			my $short_desc = $result->abstract//'';
+			my ($name, $url);
+			if (defined $result->documentation) {
+				$name = $result->documentation;
+				$url = URI->new_abs(File::Spec->catfile('pod', $name), 'https://metacpan.org')->as_string;
+			} else {
+				$name = $result->name;
+				$url = URI->new_abs(File::Spec->catfile('release', $result->distribution), 'https://metacpan.org')->as_string;
+			}
+			my $short_desc = $result->abstract // $result->description // '';
 			if (length $short_desc > 200) {
 				$short_desc = substr($short_desc, 0, 200) . '...';
 			}
-			my $output = sprintf 'CPAN module %s %s [%s] by %s : %s', $name, $result->version, $result->distribution, $result->author, $short_desc;
+			my $output = sprintf 'CPAN module %s %s [%s] by %s : %s : %s', $name, $result->version, $result->distribution, $result->author, $url, $short_desc;
 			$irc->yield(privmsg => $channel => $output);
 		} else {
 			$irc->yield(privmsg => $channel => "No results for CPAN module search");
