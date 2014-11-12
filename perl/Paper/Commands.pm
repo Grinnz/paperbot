@@ -3506,13 +3506,13 @@ sub cmd_cpan {
 		my $result = eval { $mcpan->module($module); };
 		unless (defined $result) {
 			my $search = $module;
-			my $results = $mcpan->module({ either => [
+			my $results = eval { $mcpan->module({ either => [
 				{ name => $search },
 				{ distribution => $search },
 				{ documentation => $search },
-			]});
+			]}); };
 			
-			if ($results->total) {
+			if (defined $results and $results->total) {
 				$result = $results->next;
 			}
 		}
@@ -3539,14 +3539,14 @@ sub cmd_cpan {
 		my $result = eval { $mcpan->author($author); };
 		unless (defined $result) {
 			my $search = $author;
-			my $results = $mcpan->author({ either => [
+			my $results = eval { $mcpan->author({ either => [
 				{ name => $search },
 				{ asciiname => $search },
 				{ pauseid => $search },
 				{ email => $search },
-			]});
+			]}); };
 			
-			if ($results->total) {
+			if (defined $results and $results->total) {
 				$result = $results->next;
 			}
 		}
@@ -3563,10 +3563,9 @@ sub cmd_cpan {
 		my $result = eval { $mcpan->distribution($distribution); };
 		unless (defined $result) {
 			my $search = $distribution;
-			my $results = $mcpan->distribution({ name => $search });
+			my $results = eval { $mcpan->distribution({ name => $search }); };
 			
-			my $total = $results->total;
-			if ($total) {
+			if (defined $results and my $total = $results->total) {
 				if ($total == 1) {
 					$result = $results->next;
 				} else {
