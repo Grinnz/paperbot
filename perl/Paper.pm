@@ -1556,7 +1556,6 @@ sub parse_tweet_text {
 		
 	my @urls = ($text =~ m!(https?://t.co/[[:graph:]]+)!g);
 	foreach my $url (@urls) {
-		my $url = $1;
 		my $redir_url = $self->get_redirected_url($url);
 		if ($redir_url ne $url) {
 			$text =~ s/\Q$url/$redir_url/g;
