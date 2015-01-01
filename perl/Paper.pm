@@ -1811,7 +1811,8 @@ sub update_xkcd {
 	
 	my $response = $lwp->get($url);
 	if ($response->is_success) {
-		my $xkcd = decode_json($response->decoded_content);
+		my $xkcd = eval { decode_json($response->decoded_content); };
+		warn $@ and return undef if $@;
 		$num = $xkcd->{'num'}//0;
 		my $title = $xkcd->{'title'}//'';
 		$self->cache_xkcd($num, $xkcd);
