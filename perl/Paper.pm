@@ -1741,6 +1741,7 @@ sub pyx_random_black {
 	my $pick = shift;
 	
 	my $dbh = $self->pyx_dbh;
+	return undef unless $dbh;
 	
 	my $valid_sets = $self->config_var('pyx_card_sets');
 	return undef unless defined $valid_sets;
@@ -1776,6 +1777,7 @@ sub pyx_random_white {
 	$count = 10 if $count > 10;
 	
 	my $dbh = $self->pyx_dbh;
+	return undef unless $dbh;
 	
 	my $valid_sets = $self->config_var('pyx_card_sets');
 	return undef unless defined $valid_sets;
