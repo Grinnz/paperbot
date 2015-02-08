@@ -29,6 +29,7 @@ use Digest::MD5 qw/md5_hex/;
 use Data::Validate::IP qw/is_ipv4 is_ipv6/;
 use MIME::Base64;
 use DBI;
+use DBD::Pg ':async';
 use MetaCPAN::Client;
 
 use Paper::IRC;
@@ -1756,11 +1757,23 @@ sub pyx_random_black {
 		push @valid_sets, $pick;
 	}
 	
-	my $black_card = $dbh->selectrow_hashref('SELECT "bc"."text", "bc"."pick" FROM "black_cards" AS "bc" ' .
+	my $sth = $dbh->prepare('SELECT "bc"."text", "bc"."pick" FROM "black_cards" AS "bc" ' .
 		'INNER JOIN "card_set_black_card" AS "csbc" ON "csbc"."black_card_id"="bc"."id" ' .
 		'WHERE "csbc"."card_set_id" IN ('.$sets_str.') '.$pick_str.
-		'ORDER BY random() LIMIT 1', undef, @valid_sets);
+		'ORDER BY random() LIMIT 1', { pg_async => PG_ASYNC }) or return undef;
+	$sth->execute(@valid_sets) or return undef;
+	
+	my $cutoff = time + 10;
+	until ($sth->pg_ready) {
+		$sth->pg_cancel, return undef if time > $cutoff;
+		sleep 0.1;
+	}
+	$sth->pg_result;
+	
+	my $black_card = $sth->fetchrow_hashref;
 	return undef unless defined $black_card;
+	
+	$sth->finish;
 	
 	$black_card->{'text'} = strip_pyx($black_card->{'text'});
 	
@@ -1786,13 +1799,23 @@ sub pyx_random_white {
 	my $sets_str = join ',', map { '$'.$_ } (1..@valid_sets);
 	my $limit_param = @valid_sets+1;
 	
-	my $white_cards = $dbh->selectcol_arrayref('SELECT "wc"."text" FROM "white_cards" AS "wc" ' .
+	my $sth = $dbh->prepare('SELECT "wc"."text" FROM "white_cards" AS "wc" ' .
 		'INNER JOIN "card_set_white_card" AS "cswc" ON "cswc"."white_card_id"="wc"."id" ' .
-		'WHERE "cswc"."card_set_id" IN ('.$sets_str.') GROUP BY "wc"."id" ORDER BY random() LIMIT $'.$limit_param,
-		undef, @valid_sets, $count);
+		'WHERE "cswc"."card_set_id" IN ('.$sets_str.') GROUP BY "wc"."id" ' .
+		'ORDER BY random() LIMIT $'.$limit_param, { pg_async => PG_ASYNC }) or return undef;
+	$sth->execute(@valid_sets, $count) or return undef;
+	
+	my $cutoff = time + 10;
+	until ($sth->pg_ready) {
+		$sth->pg_cancel, return undef if time > $cutoff;
+		sleep 0.1; 
+	}
+	$sth->pg_result;
+	
+	my $white_cards = $sth->fetchall_arrayref;
 	return [] unless defined $white_cards;
 	
-	$_ = strip_pyx($_) foreach @$white_cards;
+	$_ = strip_pyx($_->[0]) foreach @$white_cards;
 	
 	return $white_cards;
 }
