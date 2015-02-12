@@ -26,8 +26,6 @@ requires 'JSON::XS';
 requires 'Digest::MD5';
 requires 'Data::Validate::IP';
 requires 'MIME::Base64';
-requires 'DBI';
-requires 'DBD::Pg';
 requires 'MetaCPAN::Client';
 requires 'Date::Parse';
 requires 'Time::Duration';
