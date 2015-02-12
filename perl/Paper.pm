@@ -1723,8 +1723,14 @@ sub pyx_random_black {
 	
 	my $lwp = $self->lwp;
 	
+	my @query;
+	push @query, [pick => $pick] if defined $pick;
+	my $valid_sets = $self->config_var('pyx_card_sets');
+	if (defined $valid_sets) {
+		push @query, [card_set => $_] foreach split ' ', $valid_sets;
+	}
 	my $request = "http://grinnz.com/cards/black/rand";
-	$request .= "?pick=$pick" if defined $pick;
+	$request .= '?' . join '&', map { $_->[0].'='.$_->[1] } @query if @query;
 	
 	my $response = $lwp->get($request);
 	if ($response->is_success) {
@@ -1750,7 +1756,14 @@ sub pyx_random_white {
 	
 	my $lwp = $self->lwp;
 	
-	my $request = "http://grinnz.com/cards/white/rand?count=$count";
+	my @query;
+	push @query, [count => $count];
+	my $valid_sets = $self->config_var('pyx_card_sets');
+	if (defined $valid_sets) {
+		push @query, [card_set => $_] foreach split ' ', $valid_sets;
+	}
+	my $request = "http://grinnz.com/cards/white/rand";
+	$request .= '?' . join '&', map { $_->[0].'='.$_->[1] } @query if @query;
 	
 	my $response = $lwp->get($request);
 	if ($response->is_success) {
