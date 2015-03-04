@@ -14,7 +14,7 @@ use Scalar::Util qw/looks_like_number/;
 use Math::Complex;
 use Math::Trig;
 use Data::Validate::IP qw/is_ipv4 is_ipv6/;
-use Encode qw/decode/;
+use Encode qw/encode_utf8/;
 use LWP::Simple;
 use Net::Ping;
 
@@ -2372,11 +2372,11 @@ sub cmd_convert {
 		my ($type, $result, $in_unit, $out_unit) = $self->do_conversion($input, $from_unit, $to_unit);
 		
 		unless (defined $type and defined $result) {
-			$irc->yield(privmsg => $channel => "Cannot convert $from_unit to $to_unit");
+			$irc->yield(privmsg => $channel => encode_utf8 "Cannot convert $from_unit to $to_unit");
 			return;
 		}
 		
-		$irc->yield(privmsg => $channel => "$type conversion: $input $in_unit = $result $out_unit");
+		$irc->yield(privmsg => $channel => encode_utf8 "$type conversion: $input $in_unit = $result $out_unit");
 	} else {
 		$irc->yield(privmsg => $channel => "Usage: ~convert <num> <units> to <units>");
 	}
